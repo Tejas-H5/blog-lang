@@ -7,7 +7,7 @@ test.group("Paragraphs", [bl.parseTextBlock], () => {
 	test.add("Parses some text as one paragraph", r => {
 		const result = bl.parse("Hello there");
 		test.assertEqual(r,  result.blocks.length, 1);
-		test.assertEqual(r, result.blocks[0].type, bl.Block_Paragraph);
+		test.assertEqual(r, result.blocks[0].type, bl.Block_Text);
 		test.checkEqual(r,  result.blocks[0].items.length, 1);
 		test.assertEqual(r, result.blocks[0].items[0].type, bl.InlineItem_Text);
 		test.checkEqual(r,  result.blocks[0].items[0].text, "Hello there");
@@ -128,14 +128,14 @@ test.group("Inline code blocks", [bl.parseTextBlock], () => {
 	test.add("Parses text block with a code bock in it", r => {
 		const result = bl.parse("Hi `there`!");
 		test.assertEqual(r,  result.blocks.length, 1);
-		test.assertEqual(r, result.blocks[0].type, bl.Block_Paragraph);
+		test.assertEqual(r, result.blocks[0].type, bl.Block_Text);
 		test.checkEqual(r,  result.blocks[0].items.length, 3);
 
 		test.assertEqual(r, result.blocks[0].items[0].type, bl.InlineItem_Text);
 		test.checkEqual(r,  result.blocks[0].items[0].text, "Hi ");
 
 		test.assertEqual(r, result.blocks[0].items[1].type, bl.InlineItem_Code);
-		test.checkEqual(r,  result.blocks[0].items[1].text, "there");
+		test.checkEqual(r,  result.blocks[0].items[1].code, "there");
 
 		test.assertEqual(r, result.blocks[0].items[2].type, bl.InlineItem_Text);
 		test.checkEqual(r,  result.blocks[0].items[2].text, "!");
@@ -144,11 +144,11 @@ test.group("Inline code blocks", [bl.parseTextBlock], () => {
 	test.add("Parses text starting with a code bock in it", r => {
 		const result = bl.parse("`there`!");
 		test.assertEqual(r,  result.blocks.length, 1);
-		test.assertEqual(r, result.blocks[0].type, bl.Block_Paragraph);
+		test.assertEqual(r, result.blocks[0].type, bl.Block_Text);
 		test.checkEqual(r,  result.blocks[0].items.length, 2);
 
 		test.assertEqual(r, result.blocks[0].items[0].type, bl.InlineItem_Code);
-		test.checkEqual(r,  result.blocks[0].items[0].text, "there");
+		test.checkEqual(r,  result.blocks[0].items[0].code, "there");
 
 		test.assertEqual(r, result.blocks[0].items[1].type, bl.InlineItem_Text);
 		test.checkEqual(r,  result.blocks[0].items[1].text, "!");
@@ -157,24 +157,24 @@ test.group("Inline code blocks", [bl.parseTextBlock], () => {
 	test.add("Parses text ending with a code bock in it", r => {
 		const result = bl.parse("Hi `there`");
 		test.assertEqual(r,  result.blocks.length, 1);
-		test.assertEqual(r, result.blocks[0].type, bl.Block_Paragraph);
+		test.assertEqual(r, result.blocks[0].type, bl.Block_Text);
 		test.checkEqual(r,  result.blocks[0].items.length, 2);
 
 		test.assertEqual(r, result.blocks[0].items[0].type, bl.InlineItem_Text);
 		test.checkEqual(r,  result.blocks[0].items[0].text, "Hi ");
 
 		test.assertEqual(r, result.blocks[0].items[1].type, bl.InlineItem_Code);
-		test.checkEqual(r,  result.blocks[0].items[1].text, "there");
+		test.checkEqual(r,  result.blocks[0].items[1].code, "there");
 	});
 
 	test.add("Parses text ending with just a code bock in it", r => {
 		const result = bl.parse("`there`");
 		test.assertEqual(r, result.blocks.length, 1);
-		test.assertEqual(r, result.blocks[0].type, bl.Block_Paragraph);
+		test.assertEqual(r, result.blocks[0].type, bl.Block_Text);
 		test.checkEqual(r,  result.blocks[0].items.length, 1);
 
 		test.assertEqual(r, result.blocks[0].items[0].type, bl.InlineItem_Code);
-		test.checkEqual(r,  result.blocks[0].items[0].text, "there");
+		test.checkEqual(r,  result.blocks[0].items[0].code, "there");
 	});
 });
 
@@ -182,7 +182,7 @@ test.group("Urls", [bl.parseTextBlock], () => {
 	test.add("Parses singular url", r => {
 		const result = bl.parse("find my blog #url[here]");
 		test.assertEqual(r, result.blocks.length, 1);
-		test.assertEqual(r, result.blocks[0].type, bl.Block_Paragraph);
+		test.assertEqual(r, result.blocks[0].type, bl.Block_Text);
 		test.checkEqual(r,  result.blocks[0].items.length, 2);
 
 		test.assertEqual(r, result.blocks[0].items[0].type, bl.InlineItem_Text);
@@ -196,7 +196,7 @@ test.group("Urls", [bl.parseTextBlock], () => {
 	test.add("Parses link, url pair", r => {
 		const result = bl.parse("find my blog #url[here, link]");
 		test.assertEqual(r, result.blocks.length, 1);
-		test.assertEqual(r, result.blocks[0].type, bl.Block_Paragraph);
+		test.assertEqual(r, result.blocks[0].type, bl.Block_Text);
 		test.checkEqual(r,  result.blocks[0].items.length, 2);
 
 		test.assertEqual(r, result.blocks[0].items[0].type, bl.InlineItem_Text);
@@ -210,7 +210,7 @@ test.group("Urls", [bl.parseTextBlock], () => {
 	test.add("Parses link, url pair but they are strings", r => {
 		const result = bl.parse("find my blog #url['\"here\"', \"'link'\"]");
 		test.assertEqual(r, result.blocks.length, 1);
-		test.assertEqual(r, result.blocks[0].type, bl.Block_Paragraph);
+		test.assertEqual(r, result.blocks[0].type, bl.Block_Text);
 		test.checkEqual(r,  result.blocks[0].items.length, 2);
 
 		test.assertEqual(r, result.blocks[0].items[0].type, bl.InlineItem_Text);
@@ -226,7 +226,7 @@ test.group("Style flags", [bl.parseTextBlock], () => {
 	test.add("Parses italic inside text", r => {
 		const result = bl.parse("it _was_ real");
 		test.assertEqual(r, result.blocks.length, 1);
-		test.assertEqual(r, result.blocks[0].type, bl.Block_Paragraph);
+		test.assertEqual(r, result.blocks[0].type, bl.Block_Text);
 		test.checkEqual(r,  result.blocks[0].items.length, 3);
 
 		test.assertEqual(r, result.blocks[0].items[0].type, bl.InlineItem_Text);
@@ -245,7 +245,7 @@ test.group("Style flags", [bl.parseTextBlock], () => {
 	test.add("Parses italic on it's own", r => {
 		const result = bl.parse("_amazing_");
 		test.assertEqual(r, result.blocks.length, 1);
-		test.assertEqual(r, result.blocks[0].type, bl.Block_Paragraph);
+		test.assertEqual(r, result.blocks[0].type, bl.Block_Text);
 		test.checkEqual(r,  result.blocks[0].items.length, 1);
 
 		test.assertEqual(r, result.blocks[0].items[0].type, bl.InlineItem_Text);
@@ -256,7 +256,7 @@ test.group("Style flags", [bl.parseTextBlock], () => {
 	test.add("Parses bold inside text", r => {
 		const result = bl.parse("it *was* real");
 		test.assertEqual(r, result.blocks.length, 1);
-		test.assertEqual(r, result.blocks[0].type, bl.Block_Paragraph);
+		test.assertEqual(r, result.blocks[0].type, bl.Block_Text);
 		test.checkEqual(r,  result.blocks[0].items.length, 3);
 
 		test.assertEqual(r, result.blocks[0].items[0].type, bl.InlineItem_Text);
@@ -275,7 +275,7 @@ test.group("Style flags", [bl.parseTextBlock], () => {
 	test.add("Parses bold on it's own", r => {
 		const result = bl.parse("*amazing*");
 		test.assertEqual(r, result.blocks.length, 1);
-		test.assertEqual(r, result.blocks[0].type, bl.Block_Paragraph);
+		test.assertEqual(r, result.blocks[0].type, bl.Block_Text);
 		test.checkEqual(r,  result.blocks[0].items.length, 1);
 
 		test.assertEqual(r, result.blocks[0].items[0].type, bl.InlineItem_Text);
@@ -286,7 +286,7 @@ test.group("Style flags", [bl.parseTextBlock], () => {
 	test.add("Parses strikethrough on it's own", r => {
 		const result = bl.parse("~amazing~");
 		test.assertEqual(r, result.blocks.length, 1);
-		test.assertEqual(r, result.blocks[0].type, bl.Block_Paragraph);
+		test.assertEqual(r, result.blocks[0].type, bl.Block_Text);
 		test.checkEqual(r,  result.blocks[0].items.length, 1);
 
 		test.assertEqual(r, result.blocks[0].items[0].type, bl.InlineItem_Text);
@@ -297,7 +297,7 @@ test.group("Style flags", [bl.parseTextBlock], () => {
 	test.add("Everything", r => {
 		const result = bl.parse("_~*amazing*~_");
 		test.assertEqual(r, result.blocks.length, 1);
-		test.assertEqual(r, result.blocks[0].type, bl.Block_Paragraph);
+		test.assertEqual(r, result.blocks[0].type, bl.Block_Text);
 		test.checkEqual(r,  result.blocks[0].items.length, 1);
 
 		test.assertEqual(r, result.blocks[0].items[0].type, bl.InlineItem_Text);
@@ -306,37 +306,13 @@ test.group("Style flags", [bl.parseTextBlock], () => {
 	});
 });
 
-test.group("Bullet points", [bl.parseTextBlock], () => {
-	test.add("Parses single bullet point", r => {
-		const result = bl.parse("- Hello there");
-		test.assertEqual(r,  result.blocks.length, 1);
-		test.assertEqual(r, result.blocks[0].type, bl.Block_Bullet);
-		test.checkEqual(r,  result.blocks[0].items.length, 1);
-		test.assertEqual(r, result.blocks[0].items[0].type, bl.InlineItem_Text);
-		test.checkEqual(r,  result.blocks[0].items[0].text, "Hello there");
-	});
-
-	test.add("Parses multiple bullet point", r => {
-		const result = bl.parse("- Hello there\n- Mien Fruenda");
-		test.assertEqual(r,  result.blocks.length, 2);
-
-		test.assertEqual(r, result.blocks[0].type, bl.Block_Bullet);
-		test.assertEqual(r, result.blocks[0].items[0].type, bl.InlineItem_Text);
-		test.checkEqual(r,  result.blocks[0].items[0].text, "Hello there");
-
-		test.assertEqual(r, result.blocks[1].type, bl.Block_Bullet);
-		test.assertEqual(r, result.blocks[1].items[0].type, bl.InlineItem_Text);
-		test.checkEqual(r,  result.blocks[1].items[0].text, "Mien Fruenda");
-	});
-});
-
-test.group("Lists", [bl.parseTextBlock], () => {
+test.group("Lists and dotpoints", [bl.parseTextBlock], () => {
 	test.add("Parses single list", r => {
-		const result = bl.parse("#list[Hi]");
+		const result = bl.parse("#tab[Hi]");
 		test.assertEqual(r,  result.blocks.length, 1);
 		test.assertEqual(r, result.blocks[0].type, bl.Block_List);
 		test.assertEqual(r,  result.blocks[0].blocks.length, 1);
-		test.assertEqual(r, result.blocks[0].blocks[0].type, bl.Block_Paragraph);
+		test.assertEqual(r, result.blocks[0].blocks[0].type, bl.Block_Text);
 		test.assertEqual(r, result.blocks[0].blocks[0].items[0].type, bl.InlineItem_Text);
 		test.assertEqual(r, result.blocks[0].blocks[0].items[0].text, "Hi");
 	});
@@ -345,23 +321,13 @@ test.group("Lists", [bl.parseTextBlock], () => {
 	// Different ways of formatting the same thing:
 	const cases = [
 		`
-		#list[
-			- Omg
-			- Omg2
-			#list[
-				- Omg3
-			]
-			- Omg4
+		#dot[
+			OMG
+			#dot[ OMG2 ]
+			#dot[ OMG3 ]
+			Omg4
 		]
 		`,
-		`#list[
-			- Omg
-			- Omg2
-			#list[
-				- Omg3
-			]
-			- Omg4
-		]`,
 	];
 
 	cases.forEach((testCase, i) => {
@@ -369,30 +335,38 @@ test.group("Lists", [bl.parseTextBlock], () => {
 			const result = bl.parse(testCase);
 
 			test.assertEqual(r, result.blocks.length, 1);
-			test.assertEqual(r, result.blocks[0].type, bl.Block_List);
-			test.assertEqual(r, result.blocks[0].blocks.length, 4);
 
-			test.assertEqual(r, result.blocks[0].blocks[0].type, bl.Block_Bullet);
-			test.assertEqual(r, result.blocks[0].blocks[0].items[0].type, bl.InlineItem_Text);
-			test.checkEqual(r, result.blocks[0].blocks[0].items[0].text, "Omg");
+			const dotpoints = result.blocks[0];
+			test.assertEqual(r, dotpoints.type, bl.Block_Dot);
+			test.assertEqual(r, dotpoints.blocks.length, 4);
 
-			test.assertEqual(r, result.blocks[0].blocks[1].type, bl.Block_Bullet);
-			test.assertEqual(r, result.blocks[0].blocks[1].items[0].type, bl.InlineItem_Text);
-			test.checkEqual(r, result.blocks[0].blocks[1].items[0].text, "Omg2");
+			testEqualBlockOfText(r, dotpoints.blocks[0], "OMG");
 
-			test.assertEqual(r, result.blocks[0].blocks[2].type, bl.Block_List);
-			test.assertEqual(r, result.blocks[0].blocks[2].blocks[0].type, bl.Block_Bullet);
+			test.assertEqual(r, dotpoints.blocks[1].type, bl.Block_Dot);
+			testEqualBlockOfText(r, dotpoints.blocks[1].blocks[0], "OMG2");
 
-			test.assertEqual(r, result.blocks[0].blocks[2].blocks[0].items.length, 1);
-			test.assertEqual(r, result.blocks[0].blocks[2].blocks[0].items[0].type, bl.InlineItem_Text);
-			test.checkEqual(r, result.blocks[0].blocks[2].blocks[0].items[0].text, "Omg3");
+			test.assertEqual(r, dotpoints.blocks[2].type, bl.Block_Dot);
+			testEqualBlockOfText(r, dotpoints.blocks[2].blocks[0], "OMG2");
 
-			test.assertEqual(r, result.blocks[0].blocks[3].type, bl.Block_Bullet);
-			test.assertEqual(r, result.blocks[0].blocks[3].items[0].type, bl.InlineItem_Text);
-			test.checkEqual(r, result.blocks[0].blocks[3].items[0].text, "Omg4");
+			testEqualBlockOfText(r, dotpoints.blocks[3], "OMG");
 		});
 	});
+
+	test.add("[debug]Parses text after a list", r => {
+		const result = bl.parse(`#dot[hi] there`);
+
+		test.assertEqual(r, result.blocks.length, 2);
+		test.assertEqual(r, result.blocks[0].type, bl.Block_Dot);
+		test.assertEqual(r, result.blocks[0].type, bl.Block_Dot);
+	})
 });
+
+function testEqualBlockOfText(r: test.Result, val: bl.Block, text: string): asserts val is bl.TextBlock {
+	test.assertEqual(r, val.type, bl.Block_Text);
+	test.assertEqual(r, val.items.length, 1);
+	test.assertEqual(r, val.items[0].type, bl.InlineItem_Text);
+	test.checkEqual(r, val.items[0].text, text);
+}
 
 test.group("Tables", [bl.parseTextBlock], () => {
 	test.add("Parses table with a cell", r => {
