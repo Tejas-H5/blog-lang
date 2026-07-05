@@ -43,10 +43,22 @@ export type ListBlock = BaseItem & {
 	blocks: Block[];
 };
 
+export type TableBlock = BaseItem & {
+	type: typeof B_TABLE;
+	rows: TableRow[];
+};
+export type TableRow = {
+	cells: TableCell[];
+}
+export type TableCell = {
+	contents: Block[];
+};
+
 export type Block = 
  | TextBlock
  | CodeBlock
  | ListBlock
+ | TableBlock
  ;
 
 type BaseInlineItem = BaseItem & {
@@ -80,6 +92,7 @@ export const B_NONE = 0;
 export const B_TEXT = 1;
 export const B_CODE = 2;
 export const B_LIST = 3;
+export const B_TABLE = 4;
 
 // Inline Text types
 export const T_NONE = 0;
@@ -112,6 +125,9 @@ const BT_QUOTE    = 4;
 const BT_CODE     = 5;
 const BT_TAB      = 6;
 const BT_DOT      = 7;
+const BT_TABLE      = 8;
+const BT_TABLE_ROW  = 9;
+const BT_TABLE_CELL = 10;
 
 function parseBlockType(parser: Parser, advance: boolean): number {
 	let blockType = BT_NORMAL;
@@ -123,6 +139,9 @@ function parseBlockType(parser: Parser, advance: boolean): number {
 	else if (compareAndMaybeAdvance(parser, "```", advance))  { blockType = BT_CODE;     }
 	else if (compareAndMaybeAdvance(parser, "#tab[", advance)) { blockType = BT_TAB;     }
 	else if (compareAndMaybeAdvance(parser, "#dot[", advance)) { blockType = BT_DOT;     }
+	else if (compareAndMaybeAdvance(parser, "#table[", advance)) { blockType = BT_TABLE; }
+	else if (compareAndMaybeAdvance(parser, "#row", advance))    { blockType = BT_TABLE_ROW; }
+	else if (compareAndMaybeAdvance(parser, "#cell", advance))   { blockType = BT_TABLE_CELL; }
 	// Heading 4 is never used. Just bold your text at that point.
 	
 	return blockType;
@@ -137,31 +156,46 @@ export function parse(markup: string): BlogPost {
 		blocks: [],
 	};
 
-	parseBlocks(parser, result.blocks);
+	const ctx: ParseContext = {};
+
+	parseBlocks(parser, result.blocks, ctx);
 
 	return result;
 }
 
-function parseBlocks(parser: Parser, blocks: Block[], withinList = false) {
-	let currentlyParsing = B_NONE;
+type ParseContext = {
+	list?:  ListBlock;
+	table?: TableBlock;
+};
+
+function parseBlocks(parser: Parser, blocks: Block[], ctx: ParseContext) {
+	let parseNext        = B_NONE;
 	let style            = S_NORMAL;
-	let listStyle         = 0;
+	let listStyle        = 0;
 
 	let doneBlockList = false;
 
 	outer: while (!reachedEnd(parser) && !doneBlockList) {
-		switch(currentlyParsing) {
+		switch(parseNext) {
 			case B_NONE: {
 				parseWhitespace(parser);
 
-				if (withinList) {
+				if (ctx.list || ctx.table) {
 					if (compareAndAdvance(parser, "]")) {
 						doneBlockList = true;
 						break outer;
 					}
 				}
 
-				currentlyParsing = B_TEXT;
+				if (ctx.table) {
+					// Advancing will be handled at the table level.
+					if (compare(parser, "#cell") || compare(parser, "#row")) {
+						doneBlockList = true;
+						break;
+					}
+				}
+
+				parseNext = B_TEXT;
 				style = S_NORMAL
 				
 				const blockType = parseBlockType(parser, true);
@@ -172,15 +206,23 @@ function parseBlocks(parser: Parser, blocks: Block[], withinList = false) {
 					case BT_HEADING3: { style = S_HEADING3 } break;
 					case BT_HEADING3: { style = S_HEADING3 } break;
 					case BT_QUOTE:    { style = S_QUOTE } break;
-					case BT_CODE:     { currentlyParsing = B_CODE } break;
-					case BT_TAB:      { currentlyParsing = B_LIST; listStyle = LS_TAB; } break;
-					case BT_DOT:      { currentlyParsing = B_LIST; listStyle = LS_DOT; } break;
+					case BT_CODE:     { parseNext = B_CODE } break;
+					case BT_TAB:      { parseNext = B_LIST; listStyle = LS_TAB; } break;
+					case BT_DOT:      { parseNext = B_LIST; listStyle = LS_DOT; } break;
+					case BT_TABLE:     { parseNext = B_TABLE; } break;
+					// NOTE: Could be htat we're dispatching this in the wrong place.
+					case BT_TABLE_ROW:  {
+						// TODO: Nothing ?
+					} break;
+					case BT_TABLE_CELL: {
+						// TODO: Nothing ?
+					} break;
 				}
 			} break;
 			case B_TEXT: {
-				currentlyParsing = B_NONE;
+				parseNext = B_NONE;
 
-				const items = parseInlineTextItems(parser, withinList);
+				const items = parseInlineTextItems(parser, ctx);
 				if (items.length > 0) {
 					blocks.push({
 						type: B_TEXT,
@@ -192,7 +234,7 @@ function parseBlocks(parser: Parser, blocks: Block[], withinList = false) {
 				}
 			} break;
 			case B_CODE: {
-				currentlyParsing = B_NONE;
+				parseNext = B_NONE;
 
 				let language = parseTextToNextLine(parser);
 				const start = parserPos(parser);
@@ -219,22 +261,73 @@ function parseBlocks(parser: Parser, blocks: Block[], withinList = false) {
 				});
 			} break;
 			case B_LIST: {
-				currentlyParsing = B_NONE;
+				parseNext = B_NONE;
 
 				const start = parserPos(parser);
 				const innerBlocks: Block[] = [];
 
-				parseBlocks(parser, innerBlocks, true);
-
-				const end = parserPos(parser);
-
-				blocks.push({
+				const list: ListBlock = {
 					type:   B_LIST,
 					start:  start,
-					end:    end,
+					end:    start,
 					blocks: innerBlocks,
 					style:  listStyle,
-				});
+				};
+
+				const ctx = { list: list };
+				parseBlocks(parser, innerBlocks, ctx);
+
+				list.end = parserPos(parser);
+
+				blocks.push(list);
+			} break;
+			case B_TABLE: {
+				parseNext = B_NONE;
+
+				let parseFailed = false;
+				const start = parserPos(parser);
+				const table: TableBlock = {
+					type:   B_TABLE,
+					start:  start,
+					end:    start,
+					rows:   [],
+				};
+				const ctx: ParseContext = { table: table };
+
+				// Parse rows
+				while (!reachedEnd(parser)) {
+					parseWhitespace(parser);
+					if (!compareAndAdvance(parser, "#row")) {
+						if (!compareAndAdvance(parser, "]")) {
+							parseFailed = true;
+						}
+						break;
+					}
+
+					const row: TableRow = { cells: [] };
+					table.rows.push(row);
+
+					// Parse cells
+					while (!reachedEnd(parser)) {
+						parseWhitespace(parser);
+						if (!compareAndAdvance(parser, "#cell")) {
+							// this happens when a row has 0 cells and 1 row.
+							compareAndAdvance(parser, "]");
+							break;
+						}
+
+						const cell: TableCell = { contents: [] };
+						row.cells.push(cell);
+						parseBlocks(parser, cell.contents, ctx);
+					}
+				}
+
+				if (parseFailed) {
+					reset(parser, start);
+				} else {
+					table.end = parserPos(parser);
+					blocks.push(table);
+				}
 			} break;
 		}
 	}
@@ -260,23 +353,23 @@ function parseInlineType(parser: Parser, advance: boolean): number {
 	return type;
 }
 
-function parseInlineTextItems(parser: Parser, withinList = false): InlineItem[] {
+function parseInlineTextItems(parser: Parser, ctx: ParseContext): InlineItem[] {
 	const items: InlineItem[] = [];
 
-	let currentlyParsing = T_NONE;
+	let parseNext        = T_NONE;
 	let foundBlockEnd    = false;
 	let styleFlags       = 0;
 
 	while (!reachedEnd(parser) && !foundBlockEnd) {
-		switch(currentlyParsing) {
+		switch(parseNext) {
 			case T_NONE: {
 				parseWhitespace(parser);
 
 				foundBlockEnd = false;
-				currentlyParsing = parseInlineType(parser, true);
+				parseNext = parseInlineType(parser, true);
 			} break;
 			case T_TEXT: {
-				currentlyParsing = T_NONE;
+				parseNext = T_NONE;
 
 				const start = parserPos(parser);
 				let end: TextPosition | undefined;
@@ -290,9 +383,18 @@ function parseInlineTextItems(parser: Parser, withinList = false): InlineItem[] 
 						break;
 					}
 
-					if (withinList) {
+					if (ctx.list || ctx.table) {
 						if (compare(parser, "]")) {
 							// Advancing will be handled at the block level.
+							foundBlockEnd = true;
+							trimEnd = true;
+							break;
+						}
+					}
+
+					if (ctx.table) {
+						// Advancing will be handled at the table level.
+						if (compare(parser, "#cell") || compare(parser, "#row")) {
 							foundBlockEnd = true;
 							trimEnd = true;
 							break;
@@ -319,8 +421,8 @@ function parseInlineTextItems(parser: Parser, withinList = false): InlineItem[] 
 
 					// Other inline items can end the text block
 					const i = parser.pos.i;
-					currentlyParsing = parseInlineType(parser, true);
-					if (currentlyParsing > T_TEXT) {
+					parseNext = parseInlineType(parser, true);
+					if (parseNext > T_TEXT) {
 						offset = parser.pos.i - i;
 						break;
 					}
@@ -355,7 +457,7 @@ function parseInlineTextItems(parser: Parser, withinList = false): InlineItem[] 
 				styleFlags = nextStyleFlags;
 			} break;
 			case T_CODE: {
-				currentlyParsing = T_TEXT;
+				parseNext = T_TEXT;
 
 				const start = parserPos(parser);
 				let end: TextPosition | undefined;
@@ -388,12 +490,14 @@ function parseInlineTextItems(parser: Parser, withinList = false): InlineItem[] 
 				items.push({ type: T_CODE, start: start, end: end, code: code, styleFlags: styleFlags });
 			} break;
 			case T_URL: {
+				parseNext = T_NONE;
+
 				const resetPos = parserPos(parser);
 
 				const urlOrText = parseFunctionArgument(parser);
 				if (!urlOrText) {
 					reset(parser, resetPos);
-					currentlyParsing = T_TEXT;
+					parseNext = T_TEXT;
 					break;
 				}
 

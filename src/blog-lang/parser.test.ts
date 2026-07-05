@@ -346,5 +346,122 @@ See`);
 	});
 });
 
+test.group("Table", [], () => {
+	test.add("Parses empty table", r => {
+		const result = bl.parse("#table[]")
+		test.assertEqual(r, result.blocks.length, 1);
+		test.assertEqual(r, result.blocks[0].type, bl.B_TABLE);
+		test.checkEqual(r,  result.blocks[0].rows.length, 0);
+	});
 
+	test.add("Parses empty table row", r => {
+		const result = bl.parse("#table[#row]")
+		test.assertEqual(r, result.blocks.length, 1);
+		test.assertEqual(r, result.blocks[0].type, bl.B_TABLE);
+		test.checkEqual(r,  result.blocks[0].rows.length, 1);
+		test.checkEqual(r,  result.blocks[0].rows[0].cells.length, 0);
+	});
 
+	test.add("Parses two empty table rows", r => {
+		const result = bl.parse("#table[#row #row]")
+		test.assertEqual(r, result.blocks.length, 1);
+		test.assertEqual(r, result.blocks[0].type, bl.B_TABLE);
+		test.checkEqual(r,  result.blocks[0].rows.length, 2);
+		test.checkEqual(r,  result.blocks[0].rows[0].cells.length, 0);
+		test.checkEqual(r,  result.blocks[0].rows[1].cells.length, 0);
+	});
+
+	test.add("Parses one empty cell", r => {
+		const result = bl.parse("#table[#row #cell]")
+		test.assertEqual(r, result.blocks.length, 1);
+		test.assertEqual(r, result.blocks[0].type, bl.B_TABLE);
+		test.assertEqual(r,  result.blocks[0].rows.length, 1);
+		test.assertEqual(r,  result.blocks[0].rows[0].cells.length, 1);
+		test.assertEqual(r,  result.blocks[0].rows[0].cells[0].contents.length, 0);
+	});
+
+	test.add("Parses two rows, each with one empty cell", r => {
+		const result = bl.parse("#table[#row #cell #row #cell]")
+		test.assertEqual(r, result.blocks.length, 1);
+		test.assertEqual(r, result.blocks[0].type, bl.B_TABLE);
+		test.assertEqual(r,  result.blocks[0].rows.length, 2);
+		test.assertEqual(r,  result.blocks[0].rows[0].cells.length, 1);
+		test.assertEqual(r,  result.blocks[0].rows[0].cells[0].contents.length, 0);
+		test.assertEqual(r,  result.blocks[0].rows[1].cells.length, 1);
+		test.assertEqual(r,  result.blocks[0].rows[1].cells[0].contents.length, 0);
+	});
+
+	test.add("Parses two rows, each with two empty cells", r => {
+		const result = bl.parse("#table[#row #cell #cell #row #cell #cell]")
+		test.assertEqual(r, result.blocks.length, 1);
+		test.assertEqual(r, result.blocks[0].type, bl.B_TABLE);
+		test.assertEqual(r,  result.blocks[0].rows.length, 2);
+		test.assertEqual(r,  result.blocks[0].rows[0].cells.length, 2);
+		test.assertEqual(r,  result.blocks[0].rows[0].cells[0].contents.length, 0);
+		test.assertEqual(r,  result.blocks[0].rows[1].cells.length, 2);
+		test.assertEqual(r,  result.blocks[0].rows[1].cells[0].contents.length, 0);
+	});
+
+	const tableVariations = [
+		{ 
+			name: "compact",
+			text: (
+`#table[
+#row #cell            #cell important   #cell not important
+#row #cell urgent     #cell do this now #cell do this later
+#row #cell not urgent #cell delegate    #cell skip
+]`
+			)
+		},
+		{ 
+			name: "tree-like",
+			text: (
+`#table[
+#row 
+	#cell
+	#cell 
+		important
+	#cell 
+		not important
+#row 
+	#cell 
+		urgent
+	#cell 
+		do this now 
+	#cell 
+		do this later
+#row 
+	#cell 
+		not urgent 
+	#cell 
+		delegate
+	#cell 
+		skip
+]`
+			)
+		},
+	]
+
+	for (const testCase of tableVariations) {
+		test.add(testCase.name + " - parses table with actual contents", r => {
+			const result = bl.parse(testCase.text)
+
+			test.assertEqual(r, result.blocks.length, 1);
+			test.assertEqual(r, result.blocks[0].type, bl.B_TABLE);
+			test.assertEqual(r,  result.blocks[0].rows.length, 3);
+			test.assertEqual(r,  result.blocks[0].rows[0].cells.length, 3);
+
+			test.assertEqual(r, result.blocks[0].rows[0].cells[0].contents.length, 0);
+			testBlockIsText(r,  result.blocks[0].rows[0].cells[1].contents[0], "important");
+			testBlockIsText(r,  result.blocks[0].rows[0].cells[2].contents[0], "not important");
+
+			testBlockIsText(r,  result.blocks[0].rows[1].cells[0].contents[0], "urgent");
+			testBlockIsText(r,  result.blocks[0].rows[1].cells[1].contents[0], "do this now");
+			testBlockIsText(r,  result.blocks[0].rows[1].cells[2].contents[0], "do this later");
+
+			testBlockIsText(r,  result.blocks[0].rows[2].cells[0].contents[0], "not urgent");
+			testBlockIsText(r,  result.blocks[0].rows[2].cells[1].contents[0], "delegate");
+			testBlockIsText(r,  result.blocks[0].rows[2].cells[2].contents[0], "skip");
+		});
+	}
+});
