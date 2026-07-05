@@ -3,8 +3,8 @@ import {
 	compare,
 	compareAndAdvance,
 	compareAndAdvanceEnd,
+	compareAndMaybeAdvance,
 	computeStandardString,
-	isWhitespace,
 	newParser,
 	Parser,
 	parserPos,
@@ -17,284 +17,227 @@ import {
 
 export type BlogPost = {
 	blocks: Block[];
-};
+}
 
-// NOTE: Enum has been deployed. Can't reorder them without breaking stuff
-export const Block_Text            = 0;
-export const Block_Heading1        = 1; // Here onwards all start new blocks
-export const Block_Heading2        = 2;
-export const Block_Heading3        = 3;
-export const Block_Heading4        = 4;
-export const Block_CodeBlock       = 5;
-export const Block_Quote           = 7;
-export const Block_List            = 8;
-export const Block_Dot             = 6;
-export const Block_Table           = 9;
-export const Block_StopParsing     = 10; // Not a real block type - we just use it to know not to parse things
-export const Block_Figure          = 12;
-export const InlineItem_Text       = 13;
-export const InlineItem_Code       = 14; // Inline code can't contain other styling within it.
-export const InlineItem_Url        = 15;
-
-export type BaseItem = {
+type BaseItem = {
 	type:  number;
 	start: TextPosition;
 	end:   TextPosition;
 };
 
 export type TextBlock = BaseItem & {
-	type:
-	 | typeof Block_Text
-	 | typeof Block_Heading1
-	 | typeof Block_Heading2
-	 | typeof Block_Heading3
-	 | typeof Block_Heading4
-	 | typeof Block_Quote
-	 ;
-
-	items: InlineItem[];
-};
+	type:       typeof B_TEXT;
+	style:      number;
+	inlineItems: InlineItem[];
+}
 
 export type CodeBlock = BaseItem & {
-	type:     typeof Block_CodeBlock;
+	type:     typeof B_CODE;
 	code:     string;
 	language: string;
 }
 
 export type ListBlock = BaseItem & {
-	type:   typeof Block_List | typeof Block_Dot;
-	blocks:  Block[];
-}
-
-export type TableBlock = BaseItem & {
-	type: typeof Block_Table;
-	rows: TableRow[];
-};
-
-type TableRow = {
-	cells: ListBlock[];
+	type:   typeof B_LIST;
+	style:  number;
+	blocks: Block[];
 };
 
 export type Block = 
  | TextBlock
  | CodeBlock
  | ListBlock
- | TableBlock
  ;
 
-export type InlineTextItem = BaseItem & {
-	type: typeof InlineItem_Text;
-	// The text is not necessarily just the stubstring between start->end.
+type BaseInlineItem = BaseItem & {
+	styleFlags: number;
+};
+
+export type InlineText = BaseInlineItem & {
+	type:  typeof T_TEXT;
+	text:  string;
+};
+
+export type InlineCode = BaseInlineItem & {
+	type:  typeof T_CODE;
+	code:  string;
+};
+
+export type InlineUrl = BaseInlineItem & {
+	type:  typeof T_URL;
 	text: string;
-	styleFlags: number;
+	url:  string;
 };
 
-export type InlineCodeItem = BaseItem & {
-	type: typeof InlineItem_Code;
-	code: string;
-};
-
-export type InlineLinkItem = BaseItem & {
-	type: typeof InlineItem_Url;
-	// It's important that our tokens have ranges, so that we can eventually make a WYSIWYG editor.
-	text: InlineTextItem;
-	url:  InlineTextItem;
-};
-
-export type InlineItem =
- | InlineTextItem
- | InlineLinkItem
- | InlineCodeItem
+export type InlineItem = 
+ | InlineText
+ | InlineCode
+ | InlineUrl
  ;
 
-export const STYLE_BOLD          = 1 << 0;
-export const STYLE_ITALIC        = 1 << 1;
-export const STYLE_STRIKETHROUGH = 1 << 2;
+// Block types
+export const B_NONE = 0;
+export const B_TEXT = 1;
+export const B_CODE = 2;
+export const B_LIST = 3;
 
-type ParseContext = {
-	styleFlags: number;
+// Inline Text types
+export const T_NONE = 0;
+export const T_TEXT = 1;
+export const T_URL  = 2;
+export const T_CODE = 3;
 
-	stopParsing: boolean;
-};
+// Visuals commands
+export const V_BOLD          = 1 << 0;
+export const V_ITALIC        = 1 << 1;
+export const V_STRIKETHROUGH = 1 << 2;
 
-function newParseContext(): ParseContext {
-	return {
-		styleFlags:  0,
-		stopParsing: false,
+// Block Styles
+export const S_NORMAL   = 0;
+export const S_HEADING1 = 1;
+export const S_HEADING2 = 2;
+export const S_HEADING3 = 3;
+export const S_QUOTE    = 4;
+
+// List styles
+export const LS_TAB = 1;
+export const LS_DOT = 2;
+
+// NOTE: Style !== block type!
+const BT_NORMAL   = 0;
+const BT_HEADING1 = 1;
+const BT_HEADING2 = 2;
+const BT_HEADING3 = 3;
+const BT_QUOTE    = 4;
+const BT_CODE     = 5;
+const BT_TAB      = 6;
+const BT_DOT      = 7;
+
+function parseBlockType(parser: Parser, advance: boolean): number {
+	let blockType = BT_NORMAL;
+
+		 if (compareAndMaybeAdvance(parser, "# ", advance))   { blockType = BT_HEADING1; }
+	else if (compareAndMaybeAdvance(parser, "## ", advance))  { blockType = BT_HEADING2; }
+	else if (compareAndMaybeAdvance(parser, "### ", advance)) { blockType = BT_HEADING3; }
+	else if (compareAndMaybeAdvance(parser, "> ", advance))   { blockType = BT_QUOTE;    }
+	else if (compareAndMaybeAdvance(parser, "```", advance))  { blockType = BT_CODE;     }
+	else if (compareAndMaybeAdvance(parser, "#tab[", advance)) { blockType = BT_TAB;     }
+	else if (compareAndMaybeAdvance(parser, "#dot[", advance)) { blockType = BT_DOT;     }
+	// Heading 4 is never used. Just bold your text at that point.
+	
+	return blockType;
+}
+
+export function parse(markup: string): BlogPost {
+	// Let's not deal with line endings in the rest of the code.
+	markup = markup.split("\r\n").join("\n");
+
+	const parser = newParser(markup);
+	const result: BlogPost = {
+		blocks: [],
 	};
+
+	parseBlocks(parser, result.blocks);
+
+	return result;
 }
 
-function getText(parser: Parser, start: TextPosition, end: TextPosition): string {
-	return parser.text.substring(start.i, end.i);
-}
+function parseBlocks(parser: Parser, blocks: Block[], withinList = false) {
+	let currentlyParsing = B_NONE;
+	let style            = S_NORMAL;
+	let listStyle         = 0;
 
-export function parse(text: string): BlogPost {
-	const ctx = newParseContext();
+	let doneBlockList = false;
 
-	const parser = newParser(text);
+	outer: while (!reachedEnd(parser) && !doneBlockList) {
+		switch(currentlyParsing) {
+			case B_NONE: {
+				parseWhitespace(parser);
 
-	const result = parseBlockList(parser, ctx, Block_List);
+				if (withinList) {
+					if (compareAndAdvance(parser, "]")) {
+						doneBlockList = true;
+						break outer;
+					}
+				}
 
-	return {
-		blocks: result.blocks,
-	};
-}
+				currentlyParsing = B_TEXT;
+				style = S_NORMAL
+				
+				const blockType = parseBlockType(parser, true);
+				switch(blockType) {
+					case BT_NORMAL:   { /* Nothing */ } break;
+					case BT_HEADING1: { style = S_HEADING1 } break;
+					case BT_HEADING2: { style = S_HEADING2 } break;
+					case BT_HEADING3: { style = S_HEADING3 } break;
+					case BT_HEADING3: { style = S_HEADING3 } break;
+					case BT_QUOTE:    { style = S_QUOTE } break;
+					case BT_CODE:     { currentlyParsing = B_CODE } break;
+					case BT_TAB:      { currentlyParsing = B_LIST; listStyle = LS_TAB; } break;
+					case BT_DOT:      { currentlyParsing = B_LIST; listStyle = LS_DOT; } break;
+				}
+			} break;
+			case B_TEXT: {
+				currentlyParsing = B_NONE;
 
-function parseBlockList(parser: Parser, ctx: ParseContext, type: ListBlock["type"]): ListBlock {
-	const start = parserPos(parser);
-	const blocks:  Block[] = [];
+				const items = parseInlineTextItems(parser, withinList);
+				if (items.length > 0) {
+					blocks.push({
+						type: B_TEXT,
+						style: style,
+						start: items[0].start,
+						end: items[items.length - 1].end,
+						inlineItems: items,
+					});
+				}
+			} break;
+			case B_CODE: {
+				currentlyParsing = B_NONE;
 
-	while (!reachedEnd(parser)) {
-		const block = parseBlock(parser, ctx);
-		if (!block) {
-			break;
-		}
+				let language = parseTextToNextLine(parser);
+				const start = parserPos(parser);
+				let end: TextPosition | undefined;
+				while (!reachedEnd(parser)) {
+					end = compareAndAdvanceEnd(parser, "```")
+					if (end) {
+						break;
+					}
+					advance(parser);
+				}
 
-		blocks.push(block);
+				if (!end) {
+					end = parserPos(parser);
+				}
 
-		if (compare(parser, "]")) {
-			// reached end of list
-			advance(parser);
-			break;
-		}
-	}
+				const code = parser.text.substring(start.i, end.i);
+				blocks.push({
+					type:     B_CODE,
+					start:    start,
+					end:      end,
+					language: language,
+					code:     code,
+				});
+			} break;
+			case B_LIST: {
+				currentlyParsing = B_NONE;
 
-	return {
-		type:  type,
-		start: start,
-		end:   parserPos(parser),
-		blocks: blocks,
-	};
-}
+				const start = parserPos(parser);
+				const innerBlocks: Block[] = [];
 
-function parseTable(parser: Parser, ctx: ParseContext): TableBlock {
-	const start = parserPos(parser);
-	const rows: TableRow[] = [];
+				parseBlocks(parser, innerBlocks, true);
 
-	while (!reachedEnd(parser)) {
-		ctx.stopParsing = false;
-		const row = parseTableRow(parser, ctx);
-		if (!row) {
-			break;
-		}
+				const end = parserPos(parser);
 
-		rows.push(row);
-
-		if (compare(parser, "]")) {
-			// reached end of table
-			advance(parser);
-			break;
-		}
-	}
-
-	return {
-		type:  Block_Table,
-		start: start,
-		end:   parserPos(parser),
-		rows: rows,
-	};
-}
-
-export function parseBlockType(parser: Parser): Block["type"] | typeof Block_StopParsing {
-	if (compareAndAdvance(parser, "#### "))   return Block_Heading4;
-	if (compareAndAdvance(parser, "### "))    return Block_Heading3;
-	if (compareAndAdvance(parser, "## "))     return Block_Heading2;
-	if (compareAndAdvance(parser, "> "))      return Block_Quote;
-
-	if (compareAndAdvance(parser, "#dot["))   return Block_Dot;
-	if (compareAndAdvance(parser, "#tab["))   return Block_List;
-
-	if (compareAndAdvance(parser, "#table[")) return Block_Table;
-	if (compare(parser, "#row"))              return Block_StopParsing;
-	if (compare(parser, "#cell"))             return Block_StopParsing;
-
-	// Heading conflicts with everything else, so we're checking for it at the end
-	if (compareAndAdvance(parser, "# "))      return Block_Heading1;
-
-	if (compareAndAdvance(parser, "```"))     return Block_CodeBlock;
-
-	return Block_Text;
-}
-
-function parseBlock(parser: Parser, ctx: ParseContext): Block | undefined {
-	if (ctx.stopParsing) return undefined;
-
-	parseWhitespace(parser);
-	const type = parseBlockType(parser);
-
-	if (type === Block_CodeBlock) return parseCodeBlock(parser, ctx);
-	if (type === Block_List)      return parseBlockList(parser, ctx, type);
-	if (type === Block_Dot)       return parseBlockList(parser, ctx, type);
-	if (type === Block_Table)     return parseTable(parser, ctx);
-
-	if (type === Block_StopParsing) {
-		ctx.stopParsing = true;
-		return undefined;
-	}
-
-	const block = parseTextBlock(parser, ctx, type);
-	if (getText(parser, block.start, block.end).trim().length === 0) {
-		return undefined;
-	}
-
-	return block;
-}
-
-function parseTableRow(parser: Parser, ctx: ParseContext): TableRow | undefined {
-	parseWhitespace(parser);
-	if (!compareAndAdvance(parser, "#row")) {
-		parseWhitespace(parser);
-		if (!compareAndAdvance(parser, "]")) {
-			// We are missing a ] here. But probably not a big deal, so I'm doing nothing
-		}
-
-		return undefined;
-	}
-
-	const cells: ListBlock[] = []; 
-
-	while (!reachedEnd(parser)) {
-		parseWhitespace(parser);
-		if (!compareAndAdvance(parser, "#cell")) {
-			break;
-		}
-
-		parseWhitespace(parser);
-		ctx.stopParsing = false;
-		const blocks = parseBlockList(parser, ctx, Block_List);
-		cells.push(blocks);
-	}
-
-	return {
-		cells: cells,
-	};
-}
-
-export function parseCodeBlock(parser: Parser, ctx: ParseContext): CodeBlock {
-	let language = parseTextToNextLine(parser);
-
-	const start = parserPos(parser);
-	let end: TextPosition | undefined;
-	while (!reachedEnd(parser)) {
-		advance(parser);
-
-		end = compareAndAdvanceEnd(parser, "\r\n```") ??
-			  compareAndAdvanceEnd(parser, "\n```");
-		if (end) {
-			break;
+				blocks.push({
+					type:   B_LIST,
+					start:  start,
+					end:    end,
+					blocks: innerBlocks,
+					style:  listStyle,
+				});
+			} break;
 		}
 	}
-
-	if (!end) end = parserPos(parser);
-
-	return {
-		type:  Block_CodeBlock,
-		start: start,
-		end:   end,
-
-		code:     getText(parser, start, end),
-		language: language,
-	};
 }
 
 function parseTextToNextLine(parser: Parser): string {
@@ -308,6 +251,228 @@ function parseTextToNextLine(parser: Parser): string {
 	return parser.text.substring(start, parser.pos.i - 1);
 }
 
+
+function parseInlineType(parser: Parser, advance: boolean): number {
+	let type = T_TEXT;
+	     if (compareAndMaybeAdvance(parser, "`", advance))     {type = T_CODE;}
+	else if (compareAndMaybeAdvance(parser, "#url[", advance)) {type = T_URL;}
+
+	return type;
+}
+
+function parseInlineTextItems(parser: Parser, withinList = false): InlineItem[] {
+	const items: InlineItem[] = [];
+
+	let currentlyParsing = T_NONE;
+	let foundBlockEnd    = false;
+	let styleFlags       = 0;
+
+	while (!reachedEnd(parser) && !foundBlockEnd) {
+		switch(currentlyParsing) {
+			case T_NONE: {
+				parseWhitespace(parser);
+
+				foundBlockEnd = false;
+				currentlyParsing = parseInlineType(parser, true);
+			} break;
+			case T_TEXT: {
+				currentlyParsing = T_NONE;
+
+				const start = parserPos(parser);
+				let end: TextPosition | undefined;
+				let trimEnd = false;
+				let offset = 0;
+				let nextStyleFlags = styleFlags;
+				while (!reachedEnd(parser)) {
+					end = compareAndAdvanceEnd(parser, "\n\n")
+					if(end) {
+						foundBlockEnd = true;
+						break;
+					}
+
+					if (withinList) {
+						if (compare(parser, "]")) {
+							// Advancing will be handled at the block level.
+							foundBlockEnd = true;
+							trimEnd = true;
+							break;
+						}
+					}
+
+					// Style commands can end the current inline text (and start a new inline text straight away).
+					if (compareAndAdvance(parser, "_")) {
+						// Nooo it needs to be parsed like a scope!!1!!1 (nah I don't care tbh)
+						nextStyleFlags = setBitFlag(styleFlags, V_ITALIC, !(styleFlags & V_ITALIC));
+						offset = 1;
+						break;
+					} 
+					if (compareAndAdvance(parser, "*")) {
+						nextStyleFlags = setBitFlag(styleFlags, V_BOLD, !(styleFlags & V_BOLD));
+						offset = 1;
+						break;
+					} 
+					if (compareAndAdvance(parser, "~")) {
+						nextStyleFlags = setBitFlag(styleFlags, V_STRIKETHROUGH, !(styleFlags & V_STRIKETHROUGH));
+						offset = 1;
+						break;
+					}
+
+					// Other inline items can end the text block
+					const i = parser.pos.i;
+					currentlyParsing = parseInlineType(parser, true);
+					if (currentlyParsing > T_TEXT) {
+						offset = parser.pos.i - i;
+						break;
+					}
+
+					// Other blocks can interrupt text.
+					const blockType = parseBlockType(parser, false)
+					if (blockType !== 0) {
+						foundBlockEnd = true;
+						trimEnd = true;
+						break;
+					}
+
+					advance(parser);
+				}
+
+				if (!end) {
+					end = parserPos(parser);
+				}
+
+				let text = parser.text.substring(start.i, end.i);
+				if (trimEnd) {
+					text = text.trimEnd();
+				}
+				if (offset !== 0) {
+					text = text.substring(0, text.length - offset);
+				}
+
+				if (text.length > 0) {
+					items.push({ type: T_TEXT, start: start, end: end, text: text, styleFlags: styleFlags });
+				}
+
+				styleFlags = nextStyleFlags;
+			} break;
+			case T_CODE: {
+				currentlyParsing = T_TEXT;
+
+				const start = parserPos(parser);
+				let end: TextPosition | undefined;
+				let trim = false;
+				while (!reachedEnd(parser)) {
+					if (parser.char === "\\") {
+						// Need to be able to put ` inside of code blocks somehow
+						advance(parser);
+						advance(parser);
+						continue;
+					}
+
+					end = compareAndAdvanceEnd(parser, "`")
+					if(end) {
+						break;
+					}
+
+					advance(parser);
+				}
+
+				if (!end) {
+					end = parserPos(parser);
+				}
+
+				let code = parser.text.substring(start.i, end.i);
+				if (trim) {
+					code = code.trim();
+				}
+
+				items.push({ type: T_CODE, start: start, end: end, code: code, styleFlags: styleFlags });
+			} break;
+			case T_URL: {
+				const resetPos = parserPos(parser);
+
+				const urlOrText = parseFunctionArgument(parser);
+				if (!urlOrText) {
+					reset(parser, resetPos);
+					currentlyParsing = T_TEXT;
+					break;
+				}
+
+				const realUrl = parseFunctionArgument(parser);
+
+				let url, text;
+				if (realUrl) {
+					url  = realUrl.val;
+					text = urlOrText.val;
+				} else {
+					url  = urlOrText.val;
+					text = urlOrText.val;
+				}
+
+				let end = realUrl?.end ?? urlOrText.end;
+
+				items.push({ type: T_URL, start: resetPos, end: end, text: text, url: url, styleFlags: styleFlags });
+			} break;
+		}
+	}
+
+	return items;
+}
+
+type Arg =  {
+	start: TextPosition;
+	end:   TextPosition;
+	val:   string;
+}
+
+function parseFunctionArgument(parser: Parser): Arg | undefined {
+	parseWhitespace(parser);
+	const start = parserPos(parser);
+
+	let end = parseStandardString(parser, "'");
+	if (!end) {
+		end = parseStandardString(parser, '"');
+		if (!end) {
+			end = parseStandardString(parser, '`');
+		}
+	}
+
+	let val: string | undefined;
+	if (end) {
+		parseWhitespace(parser);
+		while(!reachedEnd(parser)) {
+			if (compareAndAdvance(parser, ",")) { break; }
+			if (compareAndAdvance(parser, "]")) { break; }
+			advance(parser);
+		}
+
+		val = computeStandardString(parser, start, end);
+		val = val.substring(1, val.length - 1)
+	} else {
+		while(!reachedEnd(parser)) {
+			end = compareAndAdvanceEnd(parser, ",") ??
+				  compareAndAdvanceEnd(parser, "]");
+			if (end) {
+				break;
+			}
+			advance(parser);
+		}
+
+		if (!end) {
+			return undefined;
+		}
+
+		val = parser.text.substring(start.i, end.i);
+	}
+
+	if (!val) return undefined;
+
+	return {
+		start: start,
+		end: end,
+		val: val,
+	};
+}
+
 function setBitFlag(flags: number, mask: number, on: boolean): number {
 	let result = flags;
 
@@ -318,244 +483,4 @@ function setBitFlag(flags: number, mask: number, on: boolean): number {
 	}
 
 	return result;
-}
-
-export function parseTextBlock(parser: Parser, ctx: ParseContext, type: TextBlock["type"]): TextBlock {
-	let start = parserPos(parser);
-
-	const items: InlineItem[] = [];
-
-	let prevEnd = start;
-	let betweenLineStartAndFirstChar = true;
-	while (!reachedEnd(parser)) {
-		if (!isWhitespace(parser.char)) {
-			betweenLineStartAndFirstChar = false;
-		}
-
-		const textBeforeBoldStart = compareAndAdvanceEnd(parser, "*");
-		if (textBeforeBoldStart) {
-			pushTextItem(parser, ctx.styleFlags, items, prevEnd, textBeforeBoldStart, false);
-			prevEnd = parserPos(parser);
-			ctx.styleFlags = setBitFlag(ctx.styleFlags, STYLE_BOLD, !(ctx.styleFlags & STYLE_BOLD));
-			continue;
-		}
-
-		const textBeforeItalicStart = compareAndAdvanceEnd(parser, "_");
-		if (textBeforeItalicStart) {
-			pushTextItem(parser, ctx.styleFlags, items, prevEnd, textBeforeItalicStart, false);
-			prevEnd = parserPos(parser);
-			ctx.styleFlags = setBitFlag(ctx.styleFlags, STYLE_ITALIC, !(ctx.styleFlags & STYLE_ITALIC));
-			continue;
-		}
-
-		const textBeforeStrikethroughStart = compareAndAdvanceEnd(parser, "~");
-		if (textBeforeStrikethroughStart) {
-			pushTextItem(parser, ctx.styleFlags, items, prevEnd, textBeforeStrikethroughStart, false);
-			prevEnd = parserPos(parser);
-			ctx.styleFlags = setBitFlag(ctx.styleFlags, STYLE_STRIKETHROUGH, !(ctx.styleFlags & STYLE_STRIKETHROUGH));
-			continue;
-		}
-
-		const textBeforeInlineBlockStart = compareAndAdvanceEnd(parser, "`");
-		if (textBeforeInlineBlockStart) {
-			pushTextItem(parser, ctx.styleFlags, items, prevEnd, textBeforeInlineBlockStart, false);
-
-			parseInlineCodeBlock(parser, items, parserPos(parser));
-			prevEnd = parserPos(parser);
-			continue;
-		}
-
-		const textBeforeLinkStart = compareAndAdvanceEnd(parser, "#url[");
-		if (textBeforeLinkStart) {
-			pushTextItem(parser, ctx.styleFlags, items, prevEnd, textBeforeLinkStart, false);
-			const link = parseUrl(parser, textBeforeLinkStart);
-			if (link) {
-				items.push(link);
-			}
-			prevEnd = parserPos(parser);
-			continue;
-		}
-
-		if (betweenLineStartAndFirstChar) {
-
-			// TODO: fix allocations
-			// Need to break out of a block if
-			// we've found the start of the next block
-			const pos = parserPos(parser);
-			advance(parser);
-			const resetPos = parserPos(parser);
-			const type = parseBlockType(parser);
-			if (type !== Block_Text) {
-				reset(parser, resetPos);
-				pushTextItem(parser, ctx.styleFlags, items, prevEnd, pos, true);
-				prevEnd = parserPos(parser);
-				break;
-			}
-
-			reset(parser, pos);
-		}
-
-		const blockEnd = 
-			compareAndAdvanceEnd(parser, "\r\n\r\n") ?? 
-			compareAndAdvanceEnd(parser, "\n\n")
-			;
-
-		if (blockEnd) {
-			pushTextItem(parser, ctx.styleFlags, items, prevEnd, blockEnd, true);
-			prevEnd = parserPos(parser);
-			break;
-		}
-
-		// Need to break out of a list if we've found the end. 
-		if (compare(parser, "]")) {
-			pushTextItem(parser, ctx.styleFlags, items, prevEnd, parserPos(parser), true);
-			prevEnd = parserPos(parser);
-			break;
-		}
-
-		if (reachedEnd(parser)) {
-			// End of paragraph
-			pushTextItem(parser, ctx.styleFlags, items, prevEnd, parserPos(parser), true);
-			prevEnd = parserPos(parser);
-			break;
-		}
-
-		advance(parser);
-		if (parser.char === "\n") {
-			betweenLineStartAndFirstChar = true;
-		} else if (!isWhitespace(parser.char)) {
-			betweenLineStartAndFirstChar = false;
-		}
-	}
-
-	pushTextItem(parser, ctx.styleFlags, items, prevEnd, parserPos(parser), true);
-	prevEnd = parserPos(parser);
-
-	const end = parserPos(parser);
-
-	return {
-		type:  type,
-		start: start,
-		end:   end,
-		items: items,
-	};
-}
-
-function pushTextItem(
-	parser: Parser,
-	styleFlags: number,
-	items: InlineItem[],
-	start: TextPosition, end: TextPosition, shouldTrimEnd: boolean
-) {
-	let text = getText(parser, start, end);
-	if (shouldTrimEnd) {
-		text = text.trimEnd();
-	}
-
-	if (text.length > 0) {
-		items.push({
-			type:  InlineItem_Text,
-			start: start,
-			end:   end, 
-			text:  text,
-			styleFlags: styleFlags,
-		})
-	}
-}
-
-function parseInlineCodeBlock(parser: Parser, items: InlineItem[], start: TextPosition) {
-	while (!reachedEnd(parser)) {
-		const end = compareAndAdvanceEnd(parser, "`");
-		if (end) {
-			items.push({
-				type:  InlineItem_Code,
-				start: start,
-				end:   end,
-				code:  getText(parser, start, end),
-			});
-			break;
-		}
-
-		advance(parser);
-	}
-}
-
-function parseOptionalCommaOrEndOfFunctionArgs(parser: Parser) {
-	if (compareAndAdvance(parser, "]")) {
-		return;
-	}
-
-	if (compareAndAdvance(parser, ",")) {
-		advance(parser);
-		parseWhitespace(parser);
-	}
-}
-
-// NOTE: functions are like #expr[a, b, c]
-function parseFunctionArgument(parser: Parser): InlineTextItem | undefined {
-	const start = parserPos(parser);
-
-	let end       = parseStandardString(parser, '"');
-	if (!end) end = parseStandardString(parser, "'");
-	if (!end) end = parseStandardString(parser, "`");
-	if (end) {
-		const arg = computeStandardString(parser, start, end);
-
-		parseOptionalCommaOrEndOfFunctionArgs(parser);
-
-		return {
-			type: InlineItem_Text,
-			start: start,
-			end:   end,
-			text:  arg,
-			styleFlags: 0,
-		};
-	}
-
-	// Just try parsing to the next , or )
-	while (!reachedEnd(parser)) {
-		advance(parser);
-		if (parser.char === "]" || parser.char === ",") {
-			end = parserPos(parser);
-			break;
-		}
-	}
-
-	if (!end) {
-		reset(parser, start);
-		return undefined;
-	}
-
-	const text = getText(parser, start, end).trim();
-	advance(parser);
-
-	return {
-		type:  InlineItem_Text,
-		start: start, 
-		end:   end,
-		text:  text,
-		styleFlags: 0,
-	};
-}
-
-function parseUrl(parser: Parser, start: TextPosition): InlineLinkItem | undefined {
-	const urlOrText = parseFunctionArgument(parser);
-	if (!urlOrText) {
-		return undefined;
-	}
-
-	let url  = urlOrText;
-	let text = urlOrText;
-	const realUrl = parseFunctionArgument(parser);
-	if  (realUrl) {
-		url = realUrl;
-	}
-
-	return {
-		type:  InlineItem_Url,
-		start: start,
-		end:   parserPos(parser),
-		text:  text,
-		url:   url,
-	};
 }

@@ -3,95 +3,69 @@ import * as bl from ".";
 
 test.file("./parser.test.ts");
 
-test.group("Paragraphs", [bl.parseTextBlock], () => {
+function testBlockIsText(r: test.Result, block: bl.Block, text: string) {
+	test.assertEqual(r, block.type, bl.B_TEXT);
+	test.assertEqual(r, block.inlineItems[0].type, bl.T_TEXT);
+	test.assertEqual(r, block.inlineItems[0].text, text);
+}
+
+test.group("Paragraphs", [], () => {
 	test.add("Parses some text as one paragraph", r => {
 		const result = bl.parse("Hello there");
-		test.assertEqual(r,  result.blocks.length, 1);
-		test.assertEqual(r, result.blocks[0].type, bl.Block_Text);
-		test.checkEqual(r,  result.blocks[0].items.length, 1);
-		test.assertEqual(r, result.blocks[0].items[0].type, bl.InlineItem_Text);
-		test.checkEqual(r,  result.blocks[0].items[0].text, "Hello there");
+		test.assertEqual(r, result.blocks.length, 1);
+		testBlockIsText(r, result.blocks[0], "Hello there");
 	});
 
 	test.add("Parses double-newline as a new paragraph", r => {
 		const result = bl.parse("A\n\nHi 2");
 		test.checkEqual(r, result.blocks.length, 2);
+		testBlockIsText(r, result.blocks[0], "A");
+		testBlockIsText(r, result.blocks[1], "Hi 2");
 	});
 
 	// TODO: consider preserving this space, so that the output is more representative.
 	test.add("Triple newline is also fine", r => {
 		const result = bl.parse("A\n\n\n\n\nHi 2");
 		test.checkEqual(r, result.blocks.length, 2);
+		testBlockIsText(r, result.blocks[0], "A");
+		testBlockIsText(r, result.blocks[1], "Hi 2");
 	});
 })
 
-test.group("Headings", [bl.parseBlockType, bl.parseTextBlock], () => {
-	test.add("Parses Heading level 4", r => {
-		const result = bl.parse("#### Hello there");
-		test.assertEqual(r,  result.blocks.length, 1);
-		test.assertEqual(r, result.blocks[0].type, bl.Block_Heading4);
-		test.checkEqual(r,  result.blocks[0].items.length, 1);
-		test.assertEqual(r, result.blocks[0].items[0].type, bl.InlineItem_Text);
-		test.checkEqual(r,  result.blocks[0].items[0].text, "Hello there");
-	});
-
+test.group("Headings", [], () => {
 	test.add("Parses Heading level 3", r => {
 		const result = bl.parse("### Hello there");
-		test.assertEqual(r,  result.blocks.length, 1);
-		test.assertEqual(r, result.blocks[0].type, bl.Block_Heading3);
-		test.checkEqual(r,  result.blocks[0].items.length, 1);
-		test.assertEqual(r, result.blocks[0].items[0].type, bl.InlineItem_Text);
-		test.checkEqual(r,  result.blocks[0].items[0].text, "Hello there");
+		test.assertEqual(r, result.blocks.length, 1);
+		test.assertEqual(r, result.blocks[0].type, bl.B_TEXT);
+		test.assertEqual(r, result.blocks[0].style, bl.S_HEADING3);
+		testBlockIsText(r,  result.blocks[0], "Hello there");
 	});
+
 	test.add("Parses Heading level 2", r => {
 		const result = bl.parse("## Hello there");
-		test.assertEqual(r,  result.blocks.length, 1);
-		test.assertEqual(r, result.blocks[0].type, bl.Block_Heading2);
-		test.checkEqual(r,  result.blocks[0].items.length, 1);
-		test.assertEqual(r, result.blocks[0].items[0].type, bl.InlineItem_Text);
-		test.checkEqual(r,  result.blocks[0].items[0].text, "Hello there");
+		test.assertEqual(r, result.blocks.length, 1);
+		test.assertEqual(r, result.blocks[0].type, bl.B_TEXT);
+		test.assertEqual(r, result.blocks[0].style, bl.S_HEADING2);
+		testBlockIsText(r,  result.blocks[0], "Hello there");
 	});
 
 	test.add("Parses Heading level 1", r => {
 		const result = bl.parse("# Hello there");
-		test.assertEqual(r,  result.blocks.length, 1);
-		test.assertEqual(r, result.blocks[0].type, bl.Block_Heading1);
-		test.checkEqual(r,  result.blocks[0].items.length, 1);
-		test.assertEqual(r, result.blocks[0].items[0].type, bl.InlineItem_Text);
-		test.checkEqual(r,  result.blocks[0].items[0].text, "Hello there");
+		test.assertEqual(r, result.blocks.length, 1);
+		test.assertEqual(r, result.blocks[0].type, bl.B_TEXT);
+		test.assertEqual(r, result.blocks[0].style, bl.S_HEADING1);
+		testBlockIsText(r,  result.blocks[0], "Hello there");
 	});
 
 	test.add("Heading parsing works with single new line", r => {
-		const result = bl.parse("# Hello\nthere");
-		test.assertEqual(r,  result.blocks.length, 1);
-		test.assertEqual(r, result.blocks[0].type, bl.Block_Heading1);
-		test.checkEqual(r,  result.blocks[0].items.length, 1);
-		test.assertEqual(r, result.blocks[0].items[0].type, bl.InlineItem_Text);
-		test.checkEqual(r,  result.blocks[0].items[0].text, "Hello\nthere");
-	});
-
-	test.add("Headings seperated by single newline", r => {
 		const result = bl.parse("# Hello\n# there");
-		test.checkEqual(r,  result.blocks.length, 2);
-
-		test.assertEqual(r, result.blocks[0].type, bl.Block_Heading1);
-		test.checkEqual(r,  result.blocks[0].items.length, 1);
-		test.assertEqual(r, result.blocks[0].items[0].type, bl.InlineItem_Text);
-		test.checkEqual(r,  result.blocks[0].items[0].text, "Hello");
-
-		test.assertEqual(r, result.blocks[1].type, bl.Block_Heading1);
-		test.checkEqual(r,  result.blocks[1].items.length, 1);
-		test.assertEqual(r, result.blocks[1].items[0].type, bl.InlineItem_Text);
-		test.checkEqual(r,  result.blocks[1].items[0].text, "there");
-	});
-
-	test.add("Parses Heading level 1", r => {
-		const result = bl.parse("# Hello there");
-		test.assertEqual(r,  result.blocks.length, 1);
-		test.assertEqual(r, result.blocks[0].type, bl.Block_Heading1);
-		test.checkEqual(r,  result.blocks[0].items.length, 1);
-		test.assertEqual(r, result.blocks[0].items[0].type, bl.InlineItem_Text);
-		test.checkEqual(r,  result.blocks[0].items[0].text, "Hello there");
+		test.assertEqual(r, result.blocks.length, 2);
+		test.assertEqual(r, result.blocks[0].type, bl.B_TEXT);
+		test.assertEqual(r, result.blocks[0].style, bl.S_HEADING1);
+		testBlockIsText(r,  result.blocks[0], "Hello");
+		test.assertEqual(r, result.blocks[1].type, bl.B_TEXT);
+		test.assertEqual(r, result.blocks[1].style, bl.S_HEADING1);
+		testBlockIsText(r,  result.blocks[1], "there");
 	});
 })
 
@@ -99,291 +73,278 @@ test.group("Quotes", [], () => {
 	test.add("Parses quote", r => {
 		const result = bl.parse("> Hello there");
 		test.assertEqual(r,  result.blocks.length, 1);
-		test.assertEqual(r, result.blocks[0].type, bl.Block_Quote);
-		test.checkEqual(r,  result.blocks[0].items.length, 1);
-		test.assertEqual(r, result.blocks[0].items[0].type, bl.InlineItem_Text);
-		test.checkEqual(r,  result.blocks[0].items[0].text, "Hello there");
+		test.assertEqual(r, result.blocks[0].type, bl.B_TEXT);
+		test.assertEqual(r, result.blocks[0].style, bl.S_QUOTE);
+		testBlockIsText(r, result.blocks[0], "Hello there");
 	});
 });
 
-test.group("Code blocks", [bl.parseBlockType, bl.parseCodeBlock], () => {
+test.group("Code blocks", [], () => {
 	test.add("Parses code blocks", r => {
 		const result = bl.parse("```\nOMG\n```");
 		test.checkEqual(r, result.blocks.length, 1);
-		test.assertEqual(r, result.blocks[0].type, bl.Block_CodeBlock);
-		test.checkEqual(r, result.blocks[0].code, "OMG");
+		test.assertEqual(r, result.blocks[0].type, bl.B_CODE);
+		test.checkEqual(r, result.blocks[0].code, "OMG\n");
 		test.checkEqual(r, result.blocks[0].language, "");
 	});
 
 	test.add("Parses code blocks", r => {
 		const result = bl.parse("``` pl2 hey I can put anything here WTF ()@)(@!)(!*@\nOMG\n```");
 		test.checkEqual(r, result.blocks.length, 1);
-		test.assertEqual(r, result.blocks[0].type, bl.Block_CodeBlock);
-		test.checkEqual(r, result.blocks[0].code, "OMG");
+		test.assertEqual(r, result.blocks[0].type, bl.B_CODE);
+		test.checkEqual(r, result.blocks[0].code, "OMG\n");
 		test.checkEqual(r, result.blocks[0].language, " pl2 hey I can put anything here WTF ()@)(@!)(!*@");
 	});
 });
 
-test.group("Inline code blocks", [bl.parseTextBlock], () => {
+
+test.group("Inline code blocks", [], () => {
 	test.add("Parses text block with a code bock in it", r => {
 		const result = bl.parse("Hi `there`!");
 		test.assertEqual(r,  result.blocks.length, 1);
-		test.assertEqual(r, result.blocks[0].type, bl.Block_Text);
-		test.checkEqual(r,  result.blocks[0].items.length, 3);
+		test.assertEqual(r,  result.blocks[0].type, bl.B_TEXT);
 
-		test.assertEqual(r, result.blocks[0].items[0].type, bl.InlineItem_Text);
-		test.checkEqual(r,  result.blocks[0].items[0].text, "Hi ");
+		test.assertEqual(r,  result.blocks[0].inlineItems[0].type, bl.T_TEXT);
+		test.assertEqual(r,  result.blocks[0].inlineItems[0].text, "Hi ");
 
-		test.assertEqual(r, result.blocks[0].items[1].type, bl.InlineItem_Code);
-		test.checkEqual(r,  result.blocks[0].items[1].code, "there");
+		test.assertEqual(r,  result.blocks[0].inlineItems[1].type, bl.T_CODE);
+		test.assertEqual(r,  result.blocks[0].inlineItems[1].code, "there");
 
-		test.assertEqual(r, result.blocks[0].items[2].type, bl.InlineItem_Text);
-		test.checkEqual(r,  result.blocks[0].items[2].text, "!");
+		test.assertEqual(r,  result.blocks[0].inlineItems[2].type, bl.T_TEXT);
+		test.assertEqual(r,  result.blocks[0].inlineItems[2].text, "!");
 	});
 
 	test.add("Parses text starting with a code bock in it", r => {
 		const result = bl.parse("`there`!");
 		test.assertEqual(r,  result.blocks.length, 1);
-		test.assertEqual(r, result.blocks[0].type, bl.Block_Text);
-		test.checkEqual(r,  result.blocks[0].items.length, 2);
+		test.assertEqual(r, result.blocks[0].type, bl.B_TEXT);
+		test.checkEqual(r,  result.blocks[0].inlineItems.length, 2);
 
-		test.assertEqual(r, result.blocks[0].items[0].type, bl.InlineItem_Code);
-		test.checkEqual(r,  result.blocks[0].items[0].code, "there");
+		test.assertEqual(r, result.blocks[0].inlineItems[0].type, bl.T_CODE);
+		test.checkEqual(r,  result.blocks[0].inlineItems[0].code, "there");
 
-		test.assertEqual(r, result.blocks[0].items[1].type, bl.InlineItem_Text);
-		test.checkEqual(r,  result.blocks[0].items[1].text, "!");
+		test.assertEqual(r, result.blocks[0].inlineItems[1].type, bl.T_TEXT);
+		test.checkEqual(r,  result.blocks[0].inlineItems[1].text, "!");
 	});
-
-	test.add("Parses text ending with a code bock in it", r => {
+	
+	test.add("Parses text starting with a code bock in it", r => {
 		const result = bl.parse("Hi `there`");
 		test.assertEqual(r,  result.blocks.length, 1);
-		test.assertEqual(r, result.blocks[0].type, bl.Block_Text);
-		test.checkEqual(r,  result.blocks[0].items.length, 2);
+		test.assertEqual(r, result.blocks[0].type, bl.B_TEXT);
+		test.checkEqual(r,  result.blocks[0].inlineItems.length, 2);
 
-		test.assertEqual(r, result.blocks[0].items[0].type, bl.InlineItem_Text);
-		test.checkEqual(r,  result.blocks[0].items[0].text, "Hi ");
+		test.assertEqual(r, result.blocks[0].inlineItems[0].type, bl.T_TEXT);
+		test.checkEqual(r,  result.blocks[0].inlineItems[0].text, "Hi ");
 
-		test.assertEqual(r, result.blocks[0].items[1].type, bl.InlineItem_Code);
-		test.checkEqual(r,  result.blocks[0].items[1].code, "there");
+		test.assertEqual(r, result.blocks[0].inlineItems[1].type, bl.T_CODE);
+		test.checkEqual(r,  result.blocks[0].inlineItems[1].code, "there");
 	});
-
-	test.add("Parses text ending with just a code bock in it", r => {
+	
+	test.add("Parses text starting with a code bock in it", r => {
 		const result = bl.parse("`there`");
-		test.assertEqual(r, result.blocks.length, 1);
-		test.assertEqual(r, result.blocks[0].type, bl.Block_Text);
-		test.checkEqual(r,  result.blocks[0].items.length, 1);
+		test.assertEqual(r,  result.blocks.length, 1);
+		test.assertEqual(r, result.blocks[0].type, bl.B_TEXT);
+		test.checkEqual(r,  result.blocks[0].inlineItems.length, 1);
 
-		test.assertEqual(r, result.blocks[0].items[0].type, bl.InlineItem_Code);
-		test.checkEqual(r,  result.blocks[0].items[0].code, "there");
+		test.assertEqual(r, result.blocks[0].inlineItems[0].type, bl.T_CODE);
+		test.checkEqual(r,  result.blocks[0].inlineItems[0].code, "there");
 	});
 });
 
-test.group("Urls", [bl.parseTextBlock], () => {
+test.group("Urls", [], () => {
 	test.add("Parses singular url", r => {
 		const result = bl.parse("find my blog #url[here]");
 		test.assertEqual(r, result.blocks.length, 1);
-		test.assertEqual(r, result.blocks[0].type, bl.Block_Text);
-		test.checkEqual(r,  result.blocks[0].items.length, 2);
+		test.assertEqual(r, result.blocks[0].type, bl.B_TEXT);
+		test.checkEqual(r,  result.blocks[0].inlineItems.length, 2);
 
-		test.assertEqual(r, result.blocks[0].items[0].type, bl.InlineItem_Text);
-		test.checkEqual(r,  result.blocks[0].items[0].text, "find my blog ");
+		test.assertEqual(r, result.blocks[0].inlineItems[0].type, bl.T_TEXT);
+		test.checkEqual(r,  result.blocks[0].inlineItems[0].text, "find my blog ");
 
-		test.assertEqual(r, result.blocks[0].items[1].type, bl.InlineItem_Url);
-		test.checkEqual(r,  result.blocks[0].items[1].text.text, "here");
-		test.checkEqual(r,  result.blocks[0].items[1].url.text, "here");
+		test.assertEqual(r, result.blocks[0].inlineItems[1].type, bl.T_URL);
+		test.checkEqual(r,  result.blocks[0].inlineItems[1].text, "here");
+		test.checkEqual(r,  result.blocks[0].inlineItems[1].url, "here");
 	});
 
 	test.add("Parses link, url pair", r => {
 		const result = bl.parse("find my blog #url[here, link]");
 		test.assertEqual(r, result.blocks.length, 1);
-		test.assertEqual(r, result.blocks[0].type, bl.Block_Text);
-		test.checkEqual(r,  result.blocks[0].items.length, 2);
+		test.assertEqual(r, result.blocks[0].type, bl.B_TEXT);
+		test.checkEqual(r,  result.blocks[0].inlineItems.length, 2);
 
-		test.assertEqual(r, result.blocks[0].items[0].type, bl.InlineItem_Text);
-		test.checkEqual(r,  result.blocks[0].items[0].text, "find my blog ");
+		test.assertEqual(r, result.blocks[0].inlineItems[0].type, bl.T_TEXT);
+		test.checkEqual(r,  result.blocks[0].inlineItems[0].text, "find my blog ");
 
-		test.assertEqual(r, result.blocks[0].items[1].type, bl.InlineItem_Url);
-		test.checkEqual(r,  result.blocks[0].items[1].text.text, "here");
-		test.checkEqual(r,  result.blocks[0].items[1].url.text, "link");
+		test.assertEqual(r, result.blocks[0].inlineItems[1].type, bl.T_URL);
+		test.checkEqual(r,  result.blocks[0].inlineItems[1].text, "here");
+		test.checkEqual(r,  result.blocks[0].inlineItems[1].url, "link");
 	});
 
 	test.add("Parses link, url pair but they are strings", r => {
 		const result = bl.parse("find my blog #url['\"here\"', \"'link'\"]");
 		test.assertEqual(r, result.blocks.length, 1);
-		test.assertEqual(r, result.blocks[0].type, bl.Block_Text);
-		test.checkEqual(r,  result.blocks[0].items.length, 2);
+		test.assertEqual(r, result.blocks[0].type, bl.B_TEXT);
+		test.checkEqual(r,  result.blocks[0].inlineItems.length, 2);
 
-		test.assertEqual(r, result.blocks[0].items[0].type, bl.InlineItem_Text);
-		test.checkEqual(r,  result.blocks[0].items[0].text, "find my blog ");
+		test.assertEqual(r, result.blocks[0].inlineItems[0].type, bl.T_TEXT);
+		test.checkEqual(r,  result.blocks[0].inlineItems[0].text, "find my blog ");
 
-		test.assertEqual(r, result.blocks[0].items[1].type, bl.InlineItem_Url);
-		test.checkEqual(r,  result.blocks[0].items[1].text.text, "\"here\"");
-		test.checkEqual(r,  result.blocks[0].items[1].url.text, "\'link\'");
+		test.assertEqual(r, result.blocks[0].inlineItems[1].type, bl.T_URL);
+		test.checkEqual(r,  result.blocks[0].inlineItems[1].text, "here");
+		test.checkEqual(r,  result.blocks[0].inlineItems[1].url, "link");
 	});
 });
 
-test.group("Style flags", [bl.parseTextBlock], () => {
+test.group("Style flags", [], () => {
 	test.add("Parses italic inside text", r => {
 		const result = bl.parse("it _was_ real");
 		test.assertEqual(r, result.blocks.length, 1);
-		test.assertEqual(r, result.blocks[0].type, bl.Block_Text);
-		test.checkEqual(r,  result.blocks[0].items.length, 3);
+		test.assertEqual(r, result.blocks[0].type, bl.B_TEXT);
+		test.checkEqual(r,  result.blocks[0].inlineItems.length, 3);
 
-		test.assertEqual(r, result.blocks[0].items[0].type, bl.InlineItem_Text);
-		test.checkEqual(r,  result.blocks[0].items[0].text, "it ");
-		test.checkEqual(r,  result.blocks[0].items[0].styleFlags, 0);
+		test.assertEqual(r, result.blocks[0].inlineItems[0].type, bl.T_TEXT);
+		test.checkEqual(r,  result.blocks[0].inlineItems[0].text, "it ");
+		test.checkEqual(r,  result.blocks[0].inlineItems[0].styleFlags, 0);
 
-		test.assertEqual(r, result.blocks[0].items[1].type, bl.InlineItem_Text);
-		test.checkEqual(r,  result.blocks[0].items[1].text, "was");
-		test.checkEqual(r,  result.blocks[0].items[1].styleFlags, bl.STYLE_ITALIC);
+		test.assertEqual(r, result.blocks[0].inlineItems[1].type, bl.T_TEXT);
+		test.checkEqual(r,  result.blocks[0].inlineItems[1].text, "was");
+		test.checkEqual(r,  result.blocks[0].inlineItems[1].styleFlags, bl.V_ITALIC);
 
-		test.assertEqual(r, result.blocks[0].items[2].type, bl.InlineItem_Text);
-		test.checkEqual(r,  result.blocks[0].items[2].text, " real");
-		test.checkEqual(r,  result.blocks[0].items[2].styleFlags, 0);
+		test.assertEqual(r, result.blocks[0].inlineItems[2].type, bl.T_TEXT);
+		test.checkEqual(r,  result.blocks[0].inlineItems[2].text, " real");
+		test.checkEqual(r,  result.blocks[0].inlineItems[2].styleFlags, 0);
 	});
 
 	test.add("Parses italic on it's own", r => {
 		const result = bl.parse("_amazing_");
 		test.assertEqual(r, result.blocks.length, 1);
-		test.assertEqual(r, result.blocks[0].type, bl.Block_Text);
-		test.checkEqual(r,  result.blocks[0].items.length, 1);
+		test.assertEqual(r, result.blocks[0].type, bl.T_TEXT);
+		test.checkEqual(r,  result.blocks[0].inlineItems.length, 1);
 
-		test.assertEqual(r, result.blocks[0].items[0].type, bl.InlineItem_Text);
-		test.checkEqual(r,  result.blocks[0].items[0].text, "amazing");
-		test.checkEqual(r,  result.blocks[0].items[0].styleFlags, bl.STYLE_ITALIC);
+		test.assertEqual(r, result.blocks[0].inlineItems[0].type, bl.T_TEXT);
+		test.checkEqual(r,  result.blocks[0].inlineItems[0].text, "amazing");
+		test.checkEqual(r,  result.blocks[0].inlineItems[0].styleFlags, bl.V_ITALIC);
 	});
 
 	test.add("Parses bold inside text", r => {
 		const result = bl.parse("it *was* real");
 		test.assertEqual(r, result.blocks.length, 1);
-		test.assertEqual(r, result.blocks[0].type, bl.Block_Text);
-		test.checkEqual(r,  result.blocks[0].items.length, 3);
+		test.assertEqual(r, result.blocks[0].type, bl.B_TEXT);
+		test.checkEqual(r,  result.blocks[0].inlineItems.length, 3);
 
-		test.assertEqual(r, result.blocks[0].items[0].type, bl.InlineItem_Text);
-		test.checkEqual(r,  result.blocks[0].items[0].text, "it ");
-		test.checkEqual(r,  result.blocks[0].items[0].styleFlags, 0);
+		test.assertEqual(r, result.blocks[0].inlineItems[0].type, bl.T_TEXT);
+		test.checkEqual(r,  result.blocks[0].inlineItems[0].text, "it ");
+		test.checkEqual(r,  result.blocks[0].inlineItems[0].styleFlags, 0);
 
-		test.assertEqual(r, result.blocks[0].items[1].type, bl.InlineItem_Text);
-		test.checkEqual(r,  result.blocks[0].items[1].text, "was");
-		test.checkEqual(r,  result.blocks[0].items[1].styleFlags, bl.STYLE_BOLD);
+		test.assertEqual(r, result.blocks[0].inlineItems[1].type, bl.T_TEXT);
+		test.checkEqual(r,  result.blocks[0].inlineItems[1].text, "was");
+		test.checkEqual(r,  result.blocks[0].inlineItems[1].styleFlags, bl.V_BOLD);
 
-		test.assertEqual(r, result.blocks[0].items[2].type, bl.InlineItem_Text);
-		test.checkEqual(r,  result.blocks[0].items[2].text, " real");
-		test.checkEqual(r,  result.blocks[0].items[2].styleFlags, 0);
+		test.assertEqual(r, result.blocks[0].inlineItems[2].type, bl.T_TEXT);
+		test.checkEqual(r,  result.blocks[0].inlineItems[2].text, " real");
+		test.checkEqual(r,  result.blocks[0].inlineItems[2].styleFlags, 0);
 	});
 
 	test.add("Parses bold on it's own", r => {
 		const result = bl.parse("*amazing*");
 		test.assertEqual(r, result.blocks.length, 1);
-		test.assertEqual(r, result.blocks[0].type, bl.Block_Text);
-		test.checkEqual(r,  result.blocks[0].items.length, 1);
+		test.assertEqual(r, result.blocks[0].type, bl.B_TEXT);
+		test.checkEqual(r,  result.blocks[0].inlineItems.length, 1);
 
-		test.assertEqual(r, result.blocks[0].items[0].type, bl.InlineItem_Text);
-		test.checkEqual(r,  result.blocks[0].items[0].text, "amazing");
-		test.checkEqual(r,  result.blocks[0].items[0].styleFlags, bl.STYLE_BOLD);
+		test.assertEqual(r, result.blocks[0].inlineItems[0].type, bl.T_TEXT);
+		test.checkEqual(r,  result.blocks[0].inlineItems[0].text, "amazing");
+		test.checkEqual(r,  result.blocks[0].inlineItems[0].styleFlags, bl.V_BOLD);
 	});
 
 	test.add("Parses strikethrough on it's own", r => {
 		const result = bl.parse("~amazing~");
 		test.assertEqual(r, result.blocks.length, 1);
-		test.assertEqual(r, result.blocks[0].type, bl.Block_Text);
-		test.checkEqual(r,  result.blocks[0].items.length, 1);
+		test.assertEqual(r, result.blocks[0].type, bl.B_TEXT);
+		test.checkEqual(r,  result.blocks[0].inlineItems.length, 1);
 
-		test.assertEqual(r, result.blocks[0].items[0].type, bl.InlineItem_Text);
-		test.checkEqual(r,  result.blocks[0].items[0].text, "amazing");
-		test.checkEqual(r,  result.blocks[0].items[0].styleFlags, bl.STYLE_STRIKETHROUGH);
+		test.assertEqual(r, result.blocks[0].inlineItems[0].type, bl.T_TEXT);
+		test.checkEqual(r,  result.blocks[0].inlineItems[0].text, "amazing");
+		test.checkEqual(r,  result.blocks[0].inlineItems[0].styleFlags, bl.V_STRIKETHROUGH);
 	});
 
 	test.add("Everything", r => {
 		const result = bl.parse("_~*amazing*~_");
 		test.assertEqual(r, result.blocks.length, 1);
-		test.assertEqual(r, result.blocks[0].type, bl.Block_Text);
-		test.checkEqual(r,  result.blocks[0].items.length, 1);
+		test.assertEqual(r, result.blocks[0].type, bl.B_TEXT);
+		test.checkEqual(r,  result.blocks[0].inlineItems.length, 1);
 
-		test.assertEqual(r, result.blocks[0].items[0].type, bl.InlineItem_Text);
-		test.checkEqual(r,  result.blocks[0].items[0].text, "amazing");
-		test.checkEqual(r,  result.blocks[0].items[0].styleFlags, bl.STYLE_BOLD | bl.STYLE_STRIKETHROUGH | bl.STYLE_ITALIC);
+		test.assertEqual(r, result.blocks[0].inlineItems[0].type, bl.T_TEXT);
+		test.checkEqual(r,  result.blocks[0].inlineItems[0].text, "amazing");
+		test.checkEqual(r,  result.blocks[0].inlineItems[0].styleFlags, bl.V_BOLD | bl.V_STRIKETHROUGH | bl.V_ITALIC);
 	});
 });
 
-test.group("Lists and dotpoints", [bl.parseTextBlock], () => {
-	test.add("Parses single list", r => {
-		const result = bl.parse("#tab[Hi]");
-		test.assertEqual(r,  result.blocks.length, 1);
-		test.assertEqual(r, result.blocks[0].type, bl.Block_List);
-		test.assertEqual(r,  result.blocks[0].blocks.length, 1);
-		test.assertEqual(r, result.blocks[0].blocks[0].type, bl.Block_Text);
-		test.assertEqual(r, result.blocks[0].blocks[0].items[0].type, bl.InlineItem_Text);
-		test.assertEqual(r, result.blocks[0].blocks[0].items[0].text, "Hi");
+test.group("List", [], () => {
+	test.add("Parses empty list", r => {
+		const result = bl.parse("#tab[]")
+		test.assertEqual(r, result.blocks.length, 1);
+		test.assertEqual(r, result.blocks[0].type, bl.B_LIST);
+		test.checkEqual(r,  result.blocks[0].blocks.length, 0);
 	});
 
-
-	// Different ways of formatting the same thing:
-	const cases = [
-		`
-		#dot[
-			OMG
-			#dot[ OMG2 ]
-			#dot[ OMG3 ]
-			Omg4
-		]
-		`,
-	];
-
-	cases.forEach((testCase, i) => {
-		test.add("Parses list of list of bullets case " + (i + 1), r => {
-			const result = bl.parse(testCase);
-
-			test.assertEqual(r, result.blocks.length, 1);
-
-			const dotpoints = result.blocks[0];
-			test.assertEqual(r, dotpoints.type, bl.Block_Dot);
-			test.assertEqual(r, dotpoints.blocks.length, 4);
-
-			testEqualBlockOfText(r, dotpoints.blocks[0], "OMG");
-
-			test.assertEqual(r, dotpoints.blocks[1].type, bl.Block_Dot);
-			testEqualBlockOfText(r, dotpoints.blocks[1].blocks[0], "OMG2");
-
-			test.assertEqual(r, dotpoints.blocks[2].type, bl.Block_Dot);
-			testEqualBlockOfText(r, dotpoints.blocks[2].blocks[0], "OMG2");
-
-			testEqualBlockOfText(r, dotpoints.blocks[3], "OMG");
-		});
+	test.add("Parses list with one item", r => {
+		const result = bl.parse(`#tab[
+	henlo
+]`);
+		test.assertEqual(r, result.blocks.length, 1);
+		test.assertEqual(r, result.blocks[0].type, bl.B_LIST);
+		test.checkEqual(r,  result.blocks[0].blocks.length, 1);
+		test.checkEqual(r,  result.blocks[0].style, bl.LS_TAB);
+		testBlockIsText(r, result.blocks[0].blocks[0], "henlo");
 	});
 
-	test.add("[debug]Parses text after a list", r => {
-		const result = bl.parse(`#dot[hi] there`);
+	test.add("Parses dotpoints with a different style", r => {
+		const result = bl.parse(`#dot[
+	henlo
+]`);
+		test.assertEqual(r, result.blocks.length, 1);
+		test.assertEqual(r, result.blocks[0].type, bl.B_LIST);
+		test.checkEqual(r,  result.blocks[0].blocks.length, 1);
+		test.checkEqual(r,  result.blocks[0].style, bl.LS_DOT);
+		testBlockIsText(r, result.blocks[0].blocks[0], "henlo"); // TODO: consider making "henlo\n" the expected behaviour.
+	});
 
-		test.assertEqual(r, result.blocks.length, 2);
-		test.assertEqual(r, result.blocks[0].type, bl.Block_Dot);
-		test.assertEqual(r, result.blocks[0].type, bl.Block_Dot);
-	})
-});
+	test.add("Parses things before and after a list", r => {
+		const result = bl.parse(`
+Here is the thing
+#dot[
+	premise 1
+]
+See`);
 
-function testEqualBlockOfText(r: test.Result, val: bl.Block, text: string): asserts val is bl.TextBlock {
-	test.assertEqual(r, val.type, bl.Block_Text);
-	test.assertEqual(r, val.items.length, 1);
-	test.assertEqual(r, val.items[0].type, bl.InlineItem_Text);
-	test.checkEqual(r, val.items[0].text, text);
-}
+		test.assertEqual(r, result.blocks.length, 3);
+		testBlockIsText(r, result.blocks[0], "Here is the thing");
+		test.assertEqual(r,result.blocks[1].type, bl.B_LIST);
+		test.checkEqual(r, result.blocks[1].blocks.length, 1);
+		testBlockIsText(r, result.blocks[1].blocks[0], "premise 1");
+		test.checkEqual(r, result.blocks[1].style, bl.LS_DOT);
+		testBlockIsText(r, result.blocks[2], "See");
+	});
 
-test.group("Tables", [bl.parseTextBlock], () => {
-	test.add("Parses table with a cell", r => {
-		const result = bl.parse(
-			"#table[\n" +
-			"#row\n" +
-			"	#cell A\n" +
-			"	#cell B\n" +
-			"#row\n" +
-			"	#cell C\n" +
-			"]\n"
-		);
+	test.add("Parses list within a list", r => {
+		const result = bl.parse(`
+#dot[
+	premise 1. That is because
+	#dot[
+		subpremise 1
+	]
+]`);
 
 		test.assertEqual(r, result.blocks.length, 1);
+		test.assertEqual(r,result.blocks[0].type, bl.B_LIST);
+		test.checkEqual(r, result.blocks[0].blocks.length, 2);
 
-		test.assertEqual(r, result.blocks[0].type, bl.Block_Table);
-		test.assertEqual(r, result.blocks[0].rows.length, 2);
+		testBlockIsText(r, result.blocks[0].blocks[0], "premise 1. That is because");
+
+		test.assertEqual(r,result.blocks[0].blocks[1].type, bl.B_LIST);
+		testBlockIsText(r, result.blocks[0].blocks[1].blocks[0], "subpremise 1");
 	});
-})
+});
+
+
 

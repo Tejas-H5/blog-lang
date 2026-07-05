@@ -68,6 +68,16 @@ export function compareAndAdvance(r: Parser, str: string): boolean {
 	return result;
 }
 
+export function compareAndMaybeAdvance(r: Parser, str: string, advance: boolean) {
+	let result;
+	if (advance) {
+		result = compareAndAdvance(r, str);
+	} else {
+		result = compare(r, str);
+	}
+	return result;
+}
+
 // Returns the text position _before_ the symbol we matched, if it matched
 export function compareAndAdvanceEnd(r: Parser, str: string): TextPosition | undefined {
 	let end: TextPosition | undefined;

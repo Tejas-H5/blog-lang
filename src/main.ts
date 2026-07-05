@@ -115,13 +115,13 @@ imui.init();
 const globalImCache: ImCache = [];
 imMain(globalImCache);
 
-function imRenderBlocks(c: ImCache, blocks: bl.Block[]) {
+function imRenderBlocks(c: ImCache, blocks: bl.TextBlock[]) {
 	im.For(c); for (const block of blocks) {
 		imRenderBlogpostBlock(c, block);
 	} im.ForEnd(c);
 }
 
-function imRenderBlogpostBlock(c: ImCache, block: bl.Block) {
+function imRenderBlogpostBlock(c: ImCache, block: bl.TextBlock) {
 	imBegin(c, BLOCK); {
 		if (im.isFirstRender(c)) {
 			imdom.setStyle(c, "padding", "0 0 0.5em 0");
