@@ -51,7 +51,7 @@ export function imSubHeading(c: ImCache, text: string) {
 	} imdom.ElEnd(c, el.H4);
 }
 
-export function imBegin(c: ImCache, type: DisplayType, align = LEFT, justify = LEFT) {
+export function imBegin(c: ImCache, type: DisplayType = BLOCK, align = LEFT, justify = LEFT) {
 	const result = imui.Begin(c, type);
 	imui.Align(c, align);
 	imui.Justify(c, justify);

@@ -1,4 +1,4 @@
-// IM-DOM 1.80
+// IM-DOM 1.81
 
 import { assert } from "./assert";
 import { im, ImCache } from "./im-core";
@@ -465,6 +465,10 @@ function setStyle<K extends (keyof ValidElement["style"])>(
 ) {
     // @ts-expect-error its fine tho
     root.style[key] = value;
+}
+
+function setStyleRed(c: ImCache) {
+    setStyle(c, "backgroundColor", "red");
 }
 
 function setTextUnsafe(c: ImCache, val: string) {
@@ -1713,6 +1717,7 @@ export const imdom = {
 
     /** Setting properties on DOM node */
     setStyle,
+    setStyleRed, // useful for debugging
     setStyleProperty,
     setClass,
     setAttr,
