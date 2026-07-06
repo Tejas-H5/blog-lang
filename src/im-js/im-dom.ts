@@ -248,7 +248,7 @@ function imElBegin<K extends keyof HTMLElementTagNameMap>(
     c: ImCache,
     r: KeyRef<K>
 ): DomAppender<HTMLElementTagNameMap[K]> {
-    // TODO: support changing tne type
+    // TODO: support changing the type
     // Make this entry in the current entry list, so we can delete it easily
     const appender = getCurrentAppender(c);
 

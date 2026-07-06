@@ -115,25 +115,46 @@ imui.init();
 const globalImCache: ImCache = [];
 imMain(globalImCache);
 
-function imRenderBlocks(c: ImCache, blocks: bl.TextBlock[]) {
+function imRenderBlocks(c: ImCache, blocks: bl.Block[]) {
 	im.For(c); for (const block of blocks) {
 		imRenderBlogpostBlock(c, block);
 	} im.ForEnd(c);
 }
 
-function imRenderBlogpostBlock(c: ImCache, block: bl.TextBlock) {
+function imRenderBlogpostBlock(c: ImCache, block: bl.Block) {
 	imBegin(c, BLOCK); {
 		if (im.isFirstRender(c)) {
 			imdom.setStyle(c, "padding", "0 0 0.5em 0");
 		}
 
 		im.Switch(c, block.type); switch(block.type) {
-			case bl.Block_Text: { imRenderBlogpostBlockItems(c, block.items); } break;
-			case bl.Block_Heading1:  { imdom.ElBegin(c, el.H1); { imRenderBlogpostBlockItems(c, block.items); } imdom.ElEnd(c, el.H1); } break;
-			case bl.Block_Heading2:  { imdom.ElBegin(c, el.H2); { imRenderBlogpostBlockItems(c, block.items); } imdom.ElEnd(c, el.H2); } break;
-			case bl.Block_Heading3:  { imdom.ElBegin(c, el.H3); { imRenderBlogpostBlockItems(c, block.items); } imdom.ElEnd(c, el.H3); } break;
-			case bl.Block_Heading4:  { imdom.ElBegin(c, el.H4); { imRenderBlogpostBlockItems(c, block.items); } imdom.ElEnd(c, el.H4); } break;
-			case bl.Block_CodeBlock: {
+			case bl.B_TEXT: {
+				im.Switch(c, block.style); switch(block.style) {
+					case bl.S_NORMAL: {
+						imBegin(c, BLOCK); {
+							imRenderBlogpostBlockItems(c, block.inlineItems);
+						} imEnd(c);
+					} break;
+					case bl.S_HEADING1: {
+						imdom.ElBegin(c, el.H1); {
+							imRenderBlogpostBlockItems(c, block.inlineItems);
+						} imdom.ElEnd(c, el.H1);
+					} break;
+					case bl.S_HEADING2: {
+						imdom.ElBegin(c, el.H2); {
+							imRenderBlogpostBlockItems(c, block.inlineItems);
+						} imdom.ElEnd(c, el.H2);
+					} break;
+					case bl.S_HEADING3: {
+						imdom.ElBegin(c, el.H3); {
+							imRenderBlogpostBlockItems(c, block.inlineItems);
+						} imdom.ElEnd(c, el.H3);
+					} break;
+					case bl.S_QUOTE: {
+					} break;
+				} im.SwitchEnd(c)
+			} break;
+			case bl.B_CODE: {
 				imBegin(c, BLOCK); imui.Relative(c); {
 					if (im.isFirstRender(c)) {
 						imdom.setStyle(c, "backgroundColor", cssVars.bg2);
@@ -156,41 +177,58 @@ function imRenderBlogpostBlock(c: ImCache, block: bl.TextBlock) {
 					} imEnd(c);
 				} imEnd(c);
 			} break;
-			case bl.Block_List: {
-				imBegin(c, BLOCK); {
-					if (im.isFirstRender(c)) {
-						imdom.setStyle(c, "paddingLeft", "20px");
-					}
-
-					imRenderBlocks(c, block.blocks);
-				} imEnd(c);
-			} break;
-			case bl.Block_Dot:  {
-				imBegin(c, ROW); {
-					imBegin(c, BLOCK); {
-						imBegin(c, ROW, CENTER, CENTER); {
+			case bl.B_LIST: {
+				const dotpointWidth = 8;
+				const dotpointPadding = 10;
+				im.Switch(c, block.style); switch(block.style) {
+					case bl.LS_TAB: {
+						imBegin(c, BLOCK); {
 							if (im.isFirstRender(c)) {
-								imdom.setStyle(c, "height", "1.25em");
-								imdom.setStyle(c, "paddingLeft", "2px");
-								imdom.setStyle(c, "paddingRight", "4px");
+								imdom.setStyle(c, "paddingLeft", (dotpointWidth + 2 * dotpointPadding) + "px");
 							}
+
+							imRenderBlocks(c, block.blocks);
+						} imEnd(c);
+					} break;
+					case bl.LS_DOT: {
+						imBegin(c, ROW); {
 							imBegin(c, BLOCK); {
-								if (im.isFirstRender(c)) {
-									imdom.setStyle(c, "backgroundColor", cssVars.fg);
-									imdom.setStyle(c, "borderRadius", "8px");
-									imdom.setStyle(c, "width", "8px");
-									imdom.setStyle(c, "height", "8px");
-								}
+								imBegin(c, ROW, CENTER, CENTER); {
+									if (im.isFirstRender(c)) {
+										imdom.setStyle(c, "height", "1.25em");
+										imdom.setStyle(c, "paddingLeft", dotpointPadding + "px");
+										imdom.setStyle(c, "paddingRight", dotpointPadding + "px");
+									}
+									imBegin(c, BLOCK); {
+										if (im.isFirstRender(c)) {
+											imdom.setStyle(c, "backgroundColor", cssVars.fg);
+											imdom.setStyle(c, "borderRadius", "8px");
+											imdom.setStyle(c, "width",  dotpointWidth + "px");
+											imdom.setStyle(c, "height", dotpointWidth + "px");
+										}
+									} imEnd(c);
+								} imEnd(c);
+							} imEnd(c);
+							imBegin(c, BLOCK); imFlex(c); {
+								imRenderBlocks(c, block.blocks);
 							} imEnd(c);
 						} imEnd(c);
-					} imEnd(c);
-					imBegin(c, BLOCK); imFlex(c); {
-						imRenderBlocks(c, block.blocks);
-					} imEnd(c);
+					} break;
+				} im.SwitchEnd(c);
+			} break;
+			case bl.B_TABLE: {
+				imBegin(c, BLOCK); {
+					im.For(c); for (const row of block.rows) {
+						imBegin(c, ROW); {
+							im.For(c); for (const cell of row.cells) {
+								imBegin(c, BLOCK); imFlex(c); {
+									imRenderBlocks(c, cell.contents);
+								} imEnd(c);
+							} im.ForEnd(c);
+						} imEnd(c);
+					} im.ForEnd(c);
 				} imEnd(c);
 			} break;
-			case bl.Block_Quote:      break;
-			case bl.Block_Table:      break;
 		} im.SwitchEnd(c);
 	} imEnd(c);
 }
@@ -198,25 +236,25 @@ function imRenderBlogpostBlock(c: ImCache, block: bl.TextBlock) {
 function imRenderBlogpostBlockItems(c: ImCache, items: bl.InlineItem[]) {
 	im.For(c); for (const item of items) {
 		im.Switch(c, item.type); switch(item.type) {
-			case bl.InlineItem_Text: imRenderItemText(c, item); break;
-			case bl.InlineItem_Code: imRenderItemCode(c, item); break;
-			case bl.InlineItem_Url:  imRenderItemUrl(c, item);  break;
+			case bl.T_TEXT: imRenderItemText(c, item); break;
+			case bl.T_CODE: imRenderItemCode(c, item); break;
+			case bl.T_URL:  imRenderItemUrl(c, item);  break;
 		} im.SwitchEnd(c);
 	} im.ForEnd(c);
 }
 
-function imRenderItemText(c: ImCache, item: bl.InlineTextItem) {
+function imRenderItemText(c: ImCache, item: bl.InlineText) {
 	imBegin(c, INLINE); {
 		if (im.isFirstRender(c)) {
-			imdom.setStyle(c, "fontStyle",      (item.styleFlags & bl.STYLE_ITALIC)        ? "italic" : "");
-			imdom.setStyle(c, "fontWeight",     (item.styleFlags & bl.STYLE_BOLD)          ? "bold" : "");
-			imdom.setStyle(c, "textDecoration", (item.styleFlags & bl.STYLE_STRIKETHROUGH) ? "line-through" : "");
+			imdom.setStyle(c, "fontStyle",      (item.styleFlags & bl.V_ITALIC)        ? "italic" : "");
+			imdom.setStyle(c, "fontWeight",     (item.styleFlags & bl.V_BOLD)          ? "bold" : "");
+			imdom.setStyle(c, "textDecoration", (item.styleFlags & bl.V_STRIKETHROUGH) ? "line-through" : "");
 		}
 		imStr(c, item.text);
 	} imEnd(c);
 }
 
-function imRenderItemCode(c: ImCache, item: bl.InlineCodeItem) {
+function imRenderItemCode(c: ImCache, item: bl.InlineCode) {
 	imBegin(c, INLINE); {
 		if (im.isFirstRender(c)) {
 			imdom.setStyle(c, "backgroundColor", cssVars.bg2);
@@ -226,18 +264,18 @@ function imRenderItemCode(c: ImCache, item: bl.InlineCodeItem) {
 	} imEnd(c);
 }
 
-function imRenderItemUrl(c: ImCache, item: bl.InlineLinkItem) {
+function imRenderItemUrl(c: ImCache, item: bl.InlineUrl) {
 	imBegin(c, INLINE); {
 		imdom.ElBegin(c, el.A); {
 			imButtonStyle(c, false);
 
-			const url        = item.url.text;
+			const url        = item.url;
 			const urlChanged = im.Memo(c, url);
 			if (urlChanged) {
 				imdom.setAttr(c, "href", url);
 			}
 
-			imStr(c, item.text.text);
+			imStr(c, item.text);
 
 			if (im.If(c) && imdom.hasMouseOver(c)) {
 				let domain: URL | undefined = im.GetInline(c, imRenderItemUrl);

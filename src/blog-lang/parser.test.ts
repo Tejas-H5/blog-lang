@@ -193,6 +193,18 @@ test.group("Urls", [], () => {
 		test.checkEqual(r,  result.blocks[0].inlineItems[1].text, "here");
 		test.checkEqual(r,  result.blocks[0].inlineItems[1].url, "link");
 	});
+
+	test.add("Parses url surrounded by text", r => {
+		const result = bl.parse("find my blog #url['\"here\"', \"'link'\"]\n\nNew paragraph");
+		test.assertEqual(r, result.blocks.length, 2);
+		test.assertEqual(r, result.blocks[0].type, bl.B_TEXT);
+
+		test.assertEqual(r, result.blocks[0].inlineItems.length, 2);
+		test.assertEqual(r, result.blocks[0].inlineItems[0].type, bl.T_TEXT);
+		test.assertEqual(r, result.blocks[0].inlineItems[1].type, bl.T_URL);
+
+		testBlockIsText(r, result.blocks[1], "New paragraph");
+	});
 });
 
 test.group("Style flags", [], () => {
@@ -312,9 +324,11 @@ test.group("List", [], () => {
 	test.add("Parses things before and after a list", r => {
 		const result = bl.parse(`
 Here is the thing
+
 #dot[
 	premise 1
 ]
+
 See`);
 
 		test.assertEqual(r, result.blocks.length, 3);
@@ -440,13 +454,26 @@ test.group("Table", [], () => {
 ]`
 			)
 		},
+		{ 
+			name: "other text at the end",
+			text: (
+`#table[
+#row #cell            #cell important   #cell not important
+#row #cell urgent     #cell do this now #cell do this later
+#row #cell not urgent #cell delegate    #cell skip
+]
+
+Some other text here`
+			),
+			totalBlocks: 2
+		},
 	]
 
 	for (const testCase of tableVariations) {
 		test.add(testCase.name + " - parses table with actual contents", r => {
 			const result = bl.parse(testCase.text)
 
-			test.assertEqual(r, result.blocks.length, 1);
+			test.assertEqual(r, result.blocks.length, testCase.totalBlocks ?? 1);
 			test.assertEqual(r, result.blocks[0].type, bl.B_TABLE);
 			test.assertEqual(r,  result.blocks[0].rows.length, 3);
 			test.assertEqual(r,  result.blocks[0].rows[0].cells.length, 3);

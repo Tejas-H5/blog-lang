@@ -68,7 +68,40 @@ You could write it more compactly:
 #row #cell no            #cell yes
 ]
 
-Check out all my other stuff #url[here!, https://github.com/Tejas-H5] 
+You can also put tables inside other tables if you need:
+
+#table[
+#row
+    #cell
+    #cell *Row 1*
+    #cell *Row 2*
+#row
+    #cell *Col 1*
+    #cell 
+        #table[
+        #row #cell *genius idea* #cell *terrible idea*
+        #row #cell no            #cell yes
+        ]
+    #cell 
+        #table[
+        #row #cell *genius idea* #cell *terrible idea*
+        #row #cell no            #cell yes
+        ]
+#row
+    #cell *Col 2*
+    #cell 
+        #table[
+        #row #cell *genius idea* #cell *terrible idea*
+        #row #cell no            #cell yes
+        ]
+    #cell 
+        #table[
+        #row #cell *genius idea* #cell *terrible idea*
+        #row #cell no            #cell yes
+        ]
+]
+
+Check out all my other stuff #url[here!, https://github.com/Tejas-H5]
 
 A tangent - I keep forgetting how to do urls in markdown. Which one is valid?
  - (text)[link]
@@ -77,7 +110,7 @@ A tangent - I keep forgetting how to do urls in markdown. Which one is valid?
  - [link](text)
 
 Some day this will be the singular comp-sci question that comes up in a trivia night, 
-where I am the only software person on the table, and I wont be able to answer it. xDD
+where I am the only software person on the table, and I wont be able to answer it.
 
 The order with our #url[] is dead simple to remember, because it is the same order as what you 
 would think to do naturally. You know what the text for your link is, so you'll write that first.
