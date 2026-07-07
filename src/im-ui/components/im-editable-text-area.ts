@@ -1,3 +1,5 @@
+// im-editable-text-area v0.0.0
+
 import { el, ev, im, ImCache, imdom } from "/im-js";
 import { BLOCK, cssVars, FIT_CONTENT, imui, INLINE, PERCENT, setInputValue } from "/im-ui";
 
@@ -91,6 +93,18 @@ export function imHandleTextAreaEvent(c: ImCache, textArea: HTMLTextAreaElement)
 
     return result;
 }
+
+export function imSimpleTextArea(c: ImCache, text: string): SimpleTextAreaEvent | undefined {
+    let result: SimpleTextAreaEvent | undefined;
+
+    const [, textArea] = imTextAreaBegin(c, { value: text }); {
+        result = imHandleTextAreaEvent(c, textArea);
+    } imTextAreaEnd(c);
+
+    return result;
+}
+
+
 
 // My best attempt at making a text input with the layout semantics of a div.
 // NOTE: this text area has a tonne of minor things wrong with it. we should fix them at some point.

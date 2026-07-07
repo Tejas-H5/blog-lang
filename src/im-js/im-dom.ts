@@ -1,7 +1,7 @@
 // IM-DOM 1.81
 
 import { assert } from "./assert";
-import { im, ImCache } from "./im-core";
+import { im, ImCache, ImCacheRerenderFn } from "./im-core";
 
 ///////////////////////////
 // DOM-node management

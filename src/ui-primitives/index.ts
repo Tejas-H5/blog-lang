@@ -2,8 +2,9 @@ import { INTER_FONT_CSS } from "fonts/inter";
 import { el, im, ImCache, imdom } from "im-js";
 import { BLOCK, cssVars, DisplayType, imui, INLINE, LEFT } from "im-ui";
 
-// Experiment: We should only be using the stuff in here to build the majority of the code here.
-// It can be bespoke custom stuff, or even just a wrapper over imui.
+// Project-specific UI primitives.
+// I'm going to be updating im-ui very often, but I still want my older
+// stuff to work and be easy to upgrade
 
 const cssb = imui.newCssBuilder();
 cssb.s(INTER_FONT_CSS);
