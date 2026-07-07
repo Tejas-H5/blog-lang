@@ -83,11 +83,14 @@ export function imRenderBlogpostBlock(c: ImCache, block: bl.Block, depth = 0) {
 				} im.SwitchEnd(c)
 			} break;
 			case bl.B_CODE: {
+				const padding = 5;
 				imBegin(c); imui.Relative(c); {
 					if (im.isFirstRender(c)) {
 						imdom.setStyle(c, "backgroundColor", cssVars.bg2);
+						imdom.setStyle(c, "padding", padding + "px");
+						imdom.setStyle(c, "borderRadius", padding + "px");
 					}
-					imBegin(c); imui.Absolute(c, 0, PX, 0, PX, 0, NA, 0, NA); {
+					imBegin(c); imui.Absolute(c, padding, PX, padding, PX, 0, NA, 0, NA); {
 						if (im.isFirstRender(c)) {
 							imdom.setStyle(c, "fontSize", "0.7em");
 							imdom.setStyle(c, "fontStyle", "italic");
@@ -106,68 +109,33 @@ export function imRenderBlogpostBlock(c: ImCache, block: bl.Block, depth = 0) {
 				} imEnd(c);
 			} break;
 			case bl.B_LIST: {
-				// They should all be indented identically
-				const variant = depth % 4;
-				const dotpointWidth = getDotpointWidth(variant);
-				const dotpointPadding = 10;
-
-				im.Switch(c, block.style); switch (block.style) {
-					case bl.LS_TAB: {
-						imBegin(c); {
-							if (im.isFirstRender(c)) {
-								imdom.setStyle(c, "paddingLeft", (dotpointWidth + 2 * dotpointPadding) + "px");
-							}
-
-							imRenderBlocksInternal(c, block.blocks, depth + 1);
-						} imEnd(c);
-					} break;
-					case bl.LS_DOT: {
-						imBegin(c, ROW); {
-							imBegin(c); {
-								imBegin(c, ROW, CENTER, CENTER); {
-									if (im.isFirstRender(c)) {
-										imdom.setStyle(c, "height", "1.25em");
-										imdom.setStyle(c, "paddingLeft", dotpointPadding + "px");
-										imdom.setStyle(c, "paddingRight", dotpointPadding + "px");
-									}
-									imBegin(c); {
-										if (im.isFirstRender(c)) {
-											if (variant === 0) {
-												imdom.setStyle(c, "backgroundColor", cssVars.fg);
-												imdom.setStyle(c, "borderRadius", "8px");
-												imdom.setStyle(c, "width", dotpointWidth + "px");
-												imdom.setStyle(c, "height", dotpointWidth + "px");
-											} else if (variant === 1) {
-												imdom.setStyle(c, "border", "1px solid " + cssVars.fg);
-												imdom.setStyle(c, "borderRadius", "8px");
-												imdom.setStyle(c, "width", dotpointWidth + "px");
-												imdom.setStyle(c, "height", dotpointWidth + "px");
-											} else if (variant === 2) {
-												imdom.setStyle(c, "backgroundColor", cssVars.fg);
-												imdom.setStyle(c, "width", dotpointWidth + "px");
-												imdom.setStyle(c, "height", dotpointWidth + "px");
-											} else if (variant === 3) {
-												imdom.setStyle(c, "border", "1px solid " + cssVars.fg);
-												imdom.setStyle(c, "width", dotpointWidth + "px");
-												imdom.setStyle(c, "height", dotpointWidth + "px");
-											}
-										}
-									} imEnd(c);
-								} imEnd(c);
-							} imEnd(c);
-							imBegin(c); imFlex(c); {
-								imRenderBlocksInternal(c, block.blocks, depth + 1);
-							} imEnd(c);
-						} imEnd(c);
-					} break;
+				im.Switch(c, block.style); {
+					const listType = block.style === bl.LS_ORDERED ? el.OL : el.UL;
+					imdom.ElBegin(c, listType); {
+						im.For(c); for (const item of block.items) {
+							imdom.ElBegin(c, el.LI); {
+								imRenderBlocksInternal(c, item.blocks, depth + 1);
+							} imdom.ElEnd(c, el.LI);
+						} im.ForEnd(c);
+					} imdom.ElEnd(c, listType);
 				} im.SwitchEnd(c);
 			} break;
 			case bl.B_TABLE: {
-				imBegin(c); {
+				const edgeWidth = 1;
+
+				if (im.isFirstRender(c)) {
+					imdom.setStyle(c, "border", "1px solid " + cssVars.fg);
+				}
+
+				imBegin(c, COL); imGap(c, edgeWidth, PX); imui.Bg(c, cssVars.fg); {
 					im.For(c); for (const row of block.rows) {
-						imBegin(c, ROW); {
+						imBegin(c, ROW); imGap(c, edgeWidth, PX); {
 							im.For(c); for (const cell of row.cells) {
-								imBegin(c); imFlex(c); {
+								imBegin(c); imFlex(c); imui.Bg(c, cssVars.bg); {
+									if (im.isFirstRender(c)) {
+										imdom.setStyle(c, "padding", "5px");
+									}
+
 									imRenderBlocksInternal(c, cell.contents, depth + 1);
 								} imEnd(c);
 							} im.ForEnd(c);
@@ -205,6 +173,8 @@ export function imRenderItemCode(c: ImCache, item: bl.InlineCode) {
 		if (im.isFirstRender(c)) {
 			imdom.setStyle(c, "backgroundColor", cssVars.bg2);
 			imdom.setStyle(c, "fontFamily", "monospace");
+			imdom.setStyle(c, "padding", "2px 2px");
+			imdom.setStyle(c, "borderRadius", "5px");
 		}
 		imStr(c, item.code);
 	} imEnd(c);
@@ -235,23 +205,6 @@ export function imRenderItemUrl(c: ImCache, item: bl.InlineUrl) {
 		} imdom.ElEnd(c, el.A);
 	} imEnd(c);
 }
-
-
-export function getDotpointWidth(variant: number) {
-	if (variant === 0) return 8;
-	if (variant === 1) return 7; // 1px is for the border outline
-
-	// The square must be made to fit within the circles of the previous variants.
-	const sin45 = 1 / Math.sqrt(2);
-	if (variant === 2) return 8 * sin45;
-	if (variant === 3) return 7 * sin45;
-
-	// I suppose I actually need to multiply the base height of the bullet by sin45 here
-	// if I want to keep this rule I made up going, but I won't do that
-
-	return 8;
-}
-
 
 
 export function imHeading(c: ImCache, text: string) {

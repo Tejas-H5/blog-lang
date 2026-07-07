@@ -40,6 +40,10 @@ export type CodeBlock = BaseItem & {
 export type ListBlock = BaseItem & {
 	type:   typeof B_LIST;
 	style:  number;
+	items: ListItem[];
+};
+
+export type ListItem = {
 	blocks: Block[];
 };
 
@@ -113,18 +117,21 @@ export const S_HEADING3 = 3;
 export const S_QUOTE    = 4;
 
 // List styles
-export const LS_TAB = 1;
-export const LS_DOT = 2;
+export const LS_UNORDERED = 0;
+export const LS_ORDERED   = 1;
 
-// NOTE: Style !== block type!
+// Block type - this value is internal to the parser - 
+// it determines what kind of thing we've just stumbled into,
+// and is seperate to the block type or style.
+// It needs to be mapped to the appropriate type+style combination
 const BT_NORMAL   = 0;
 const BT_HEADING1 = 1;
 const BT_HEADING2 = 2;
 const BT_HEADING3 = 3;
 const BT_QUOTE    = 4;
 const BT_CODE     = 5;
-const BT_TAB      = 6;
-const BT_DOT      = 7;
+const BT_UNORDERED_LIST = 6;
+const BT_ORDERED_LIST   = 7;
 const BT_TABLE      = 8;
 const BT_TABLE_ROW  = 9;
 const BT_TABLE_CELL = 10;
@@ -137,8 +144,10 @@ function parseBlockType(parser: Parser, advance: boolean): number {
 	else if (compareAndMaybeAdvance(parser, "### ", advance)) { blockType = BT_HEADING3; }
 	else if (compareAndMaybeAdvance(parser, "> ", advance))   { blockType = BT_QUOTE;    }
 	else if (compareAndMaybeAdvance(parser, "```", advance))  { blockType = BT_CODE;     }
-	else if (compareAndMaybeAdvance(parser, "#tab[", advance)) { blockType = BT_TAB;     }
-	else if (compareAndMaybeAdvance(parser, "#dot[", advance)) { blockType = BT_DOT;     }
+	else if (compareAndMaybeAdvance(parser, "#list[", advance))  { blockType = BT_UNORDERED_LIST;  }
+	else if (compareAndMaybeAdvance(parser, "#ul[",   advance))  { blockType = BT_UNORDERED_LIST;  }
+	else if (compareAndMaybeAdvance(parser, "#ol[",   advance))  { blockType = BT_ORDERED_LIST;  }
+	else if (compareAndMaybeAdvance(parser, "#dot", advance))    { blockType = BT_ORDERED_LIST;   }
 	else if (compareAndMaybeAdvance(parser, "#table[", advance)) { blockType = BT_TABLE; }
 	else if (compareAndMaybeAdvance(parser, "#row", advance))    { blockType = BT_TABLE_ROW; }
 	else if (compareAndMaybeAdvance(parser, "#cell", advance))   { blockType = BT_TABLE_CELL; }
@@ -169,9 +178,9 @@ type ParseContext = {
 };
 
 function parseBlocks(parser: Parser, blocks: Block[], ctx: ParseContext) {
-	let parseNext        = B_NONE;
-	let style            = S_NORMAL;
-	let listStyle        = 0;
+	let parseNext = B_NONE;
+	let listStyle = LS_UNORDERED;
+	let style     = S_NORMAL;
 
 	let doneBlockList = false;
 
@@ -181,21 +190,16 @@ function parseBlocks(parser: Parser, blocks: Block[], ctx: ParseContext) {
 				parseWhitespace(parser);
 
 				if (ctx.list) {
-					if (compareAndAdvance(parser, "]")) {
+					// Advancing will be handled at the list level
+					if (compare(parser, "]") || compare(parser, "#dot")) {
 						doneBlockList = true;
 						break outer;
 					}
 				}
 
 				if (ctx.table) {
-					
-					if (compare(parser, "]")) {
-						// Advancing will be handled at the table level
-						doneBlockList = true;
-						break outer;
-					}
-
-					if (compare(parser, "#cell") || compare(parser, "#row")) {
+					// Advancing will be handled at the table level
+					if (compare(parser, "]") || compare(parser, "#cell") || compare(parser, "#row")) {
 						doneBlockList = true;
 						break outer;
 					}
@@ -213,9 +217,9 @@ function parseBlocks(parser: Parser, blocks: Block[], ctx: ParseContext) {
 					case BT_HEADING3: { style = S_HEADING3 } break;
 					case BT_QUOTE:    { style = S_QUOTE } break;
 					case BT_CODE:     { parseNext = B_CODE } break;
-					case BT_TAB:      { parseNext = B_LIST; listStyle = LS_TAB; } break;
-					case BT_DOT:      { parseNext = B_LIST; listStyle = LS_DOT; } break;
-					case BT_TABLE:     { parseNext = B_TABLE; } break;
+					case BT_UNORDERED_LIST:  { parseNext = B_LIST; listStyle = LS_UNORDERED; } break;
+					case BT_ORDERED_LIST:    { parseNext = B_LIST; listStyle = LS_ORDERED; }   break;
+					case BT_TABLE:    { parseNext = B_TABLE; } break;
 					// NOTE: Could be htat we're dispatching this in the wrong place.
 					case BT_TABLE_ROW:  {
 						// TODO: Nothing ?
@@ -269,23 +273,39 @@ function parseBlocks(parser: Parser, blocks: Block[], ctx: ParseContext) {
 			case B_LIST: {
 				parseNext = B_NONE;
 
+				let parseFailed = false;
 				const start = parserPos(parser);
-				const innerBlocks: Block[] = [];
 
 				const list: ListBlock = {
 					type:   B_LIST,
 					start:  start,
 					end:    start,
-					blocks: innerBlocks,
+					items:  [],
 					style:  listStyle,
 				};
-
 				const ctx = { list: list };
-				parseBlocks(parser, innerBlocks, ctx);
 
-				list.end = parserPos(parser);
+				// Parse list items
+				while (!reachedEnd(parser)) {
+					parseWhitespace(parser);
+					if (!compareAndAdvance(parser, "#dot")) {
+						if (!compareAndAdvance(parser, "]")) {
+							parseFailed = true;
+						}
+						break;
+					}
 
-				blocks.push(list);
+					const item: ListItem = { blocks: [] };
+					list.items.push(item)
+					parseBlocks(parser, item.blocks, ctx);
+				}
+
+				if (parseFailed) {
+					reset(parser, start);
+				} else {
+					list.end = parserPos(parser);
+					blocks.push(list);
+				}
 			} break;
 			case B_TABLE: {
 				parseNext = B_NONE;
@@ -305,8 +325,6 @@ function parseBlocks(parser: Parser, blocks: Block[], ctx: ParseContext) {
 					parseWhitespace(parser);
 					if (!compareAndAdvance(parser, "#row")) {
 						if (!compareAndAdvance(parser, "]")) {
-							console.log(parser.char);
-							console.log("what")
 							parseFailed = true;
 						}
 						break;

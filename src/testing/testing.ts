@@ -1,5 +1,7 @@
 import { deepEquals } from "./deep-equals.ts";
 
+// testing.ts v0.0.0
+
 export type Result = {
 	name:   string;
 	fails:  string[] | undefined;
